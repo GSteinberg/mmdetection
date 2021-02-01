@@ -13,13 +13,13 @@ data = dict(
         classes=classes,
         ann_file='landmine/train/coco_annotation.json'),
     val=dict(
-        img_prefix='landmine/train/',
+        img_prefix='landmine/val/',
         classes=classes,
-        ann_file='landmine/train/coco_annotation.json'),
+        ann_file='landmine/val/coco_annotation.json'),
     test=dict(
-        img_prefix='landmine/train/',
+        img_prefix='landmine/test/',
         classes=classes,
-        ann_file='landmine/train/coco_annotation.json'))
+        ann_file='landmine/test/coco_annotation.json'))
 
 # load from pre-trained model
 load_from = 'checkpoints/faster_rcnn_r101_fpn_1x_coco_20200130-f513f705.pth'
