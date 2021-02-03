@@ -5,7 +5,7 @@ model = dict(
     pretrained='torchvision://resnet101',
     backbone=dict(depth=101))
 
-dataset_type = 'coco'
+dataset_type = 'CocoDataset'
 classes = ('pfm-1', 'ksf-casing')
 data = dict(
     train=dict(
