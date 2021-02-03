@@ -9,16 +9,19 @@ dataset_type = 'COCODataset'
 classes = ('pfm-1', 'ksf-casing')
 data = dict(
     train=dict(
-        img_prefix='landmine/train/',
+        type=dataset_type,
         classes=classes,
+        img_prefix='landmine/train/',
         ann_file='landmine/train/coco_annotation.json'),
     val=dict(
-        img_prefix='landmine/val/',
+        type=dataset_type,
         classes=classes,
+        img_prefix='landmine/val/',
         ann_file='landmine/val/coco_annotation.json'),
     test=dict(
-        img_prefix='landmine/test/',
+        type=dataset_type,
         classes=classes,
+        img_prefix='landmine/test/',
         ann_file='landmine/test/coco_annotation.json'))
 
 # load from pre-trained model
