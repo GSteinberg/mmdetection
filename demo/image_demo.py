@@ -6,6 +6,7 @@ from mmdet.apis import inference_detector, init_detector, show_result_pyplot
 def main():
     parser = ArgumentParser()
     parser.add_argument('img', help='Image file')
+    parser.add_argument('output', help='Filename to output')
     parser.add_argument('config', help='Config file')
     parser.add_argument('checkpoint', help='Checkpoint file')
     parser.add_argument(
@@ -19,7 +20,7 @@ def main():
     # test a single image
     result = inference_detector(model, args.img)
     # show the results
-    show_result_pyplot(model, args.img, result, score_thr=args.score_thr)
+    show_result_pyplot(model, args.img, result, score_thr=args.score_thr, out_file=args.output)
 
 
 if __name__ == '__main__':

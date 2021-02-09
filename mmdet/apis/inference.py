@@ -187,7 +187,8 @@ def show_result_pyplot(model,
                        fig_size=(15, 10),
                        title='result',
                        block=True,
-                       wait_time=0):
+                       wait_time=0,
+                       out_file=None):
     """Visualize the detection results on the image.
 
     Args:
@@ -201,6 +202,8 @@ def show_result_pyplot(model,
         block (bool): Whether to block GUI. Default: True
         wait_time (float): Value of waitKey param.
                 Default: 0.
+        out_file (str or None): The filename to write the image.
+                Default: None.
     """
     warnings.warn('"block" will be deprecated in v2.9.0,'
                   'Please use "wait_time"')
@@ -215,4 +218,5 @@ def show_result_pyplot(model,
         wait_time=wait_time,
         win_name=title,
         bbox_color=(72, 101, 241),
-        text_color=(72, 101, 241))
+        text_color=(72, 101, 241),
+        out_file=out_file)
