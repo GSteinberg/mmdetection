@@ -5,6 +5,7 @@ import csv
 import mmcv
 import numpy as np
 import os
+import json
 import torch
 import torch.distributed as dist
 import torch.nn as nn
@@ -385,32 +386,33 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
                 coords[img_ortho].append([pascal_classes[j], score,
                         easting + (ortho_x*x_res), northing + (ortho_y*y_res)])
 
-        # ortho this photo belongs to
-        img_name = coords.keys()[0]
+        if coords:
+            # ortho this photo belongs to
+            img_name = coords.keys()[0]
 
-        # convert utm to lat long
-        for pnt in range(len(coords[img_name])):
-            lat_long = utm.to_latlon(coords[img_name][pnt][2], coords[img_name][pnt][3], 18, 'T')
-            coords[img_name][pnt].extend(lat_long)
+            # convert utm to lat long
+            for pnt in range(len(coords[img_name])):
+                lat_long = utm.to_latlon(coords[img_name][pnt][2], coords[img_name][pnt][3], 18, 'T')
+                coords[img_name][pnt].extend(lat_long)
 
-        # coords for each ortho
-        indv_ortho_file = 'faster_rcnn_r101_fpn_1x_coco_results/' + img_name + '_coords.csv'
-        with open(indv_ortho_file, 'a+', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            # if file is empty, write heading then append, else just append
-            if os.stat(file_path).st_size == 0:
-                writer.writerow(["Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
-            for c in coords[img_name]:
-                writer.writerow(c[:])
+            # coords for each ortho
+            indv_ortho_file = 'faster_rcnn_r101_fpn_1x_coco_results/' + img_name + '_coords.csv'
+            with open(indv_ortho_file, 'a+', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                # if file is empty, write heading then append, else just append
+                if os.stat(file_path).st_size == 0:
+                    writer.writerow(["Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
+                for c in coords[img_name]:
+                    writer.writerow(c[:])
 
-        # all coords from all orthos
-        with open('faster_rcnn_r101_fpn_1x_coco_results/all_coords.csv', 'a+', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            # if file is empty, write heading then append, else just append
-            if os.stat(file_path).st_size == 0:
-                writer.writerow(["Photo", "Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
-            for c in coords[img_name]:
-                writer.writerow([img_name] + c[:])
+            # all coords from all orthos
+            with open('faster_rcnn_r101_fpn_1x_coco_results/all_coords.csv', 'a+', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                # if file is empty, write heading then append, else just append
+                if os.stat(file_path).st_size == 0:
+                    writer.writerow(["Photo", "Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
+                for c in coords[img_name]:
+                    writer.writerow([img_name] + c[:])
 
         # draw bounding boxes
         img = imshow_det_bboxes(
