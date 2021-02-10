@@ -1,8 +1,10 @@
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 
+import csv
 import mmcv
 import numpy as np
+import os
 import torch
 import torch.distributed as dist
 import torch.nn as nn
@@ -336,6 +338,80 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
         # if out_file specified, do not show image in window
         if out_file is not None:
             show = False
+
+        coords = {}
+        for bbox in bboxes:
+            # if score is greater than score threshold
+            if bbox[4] > score_thr:
+                # row and col of image in respective orthophoto (img_ortho)
+                split_img_name = img_name.split("_Split")
+                img_row, img_col = int(split_img_name[1][:2]), int(split_img_name[1][2:4])
+                img_ortho = split_img_name[0]
+                full_img_ortho_name = img_ortho + ".tif"
+            
+                # 2 elemt list of pixel of center of landmine
+                # structure: [average(xmin, xmax), average(ymin, ymax)]
+                cropped_px = [ int((int(bbox[0]) + int(bbox[2])) / 2),
+                               int((int(bbox[1]) + int(bbox[3])) / 2) ]
+                score = float(bbox[4])
+
+                # getting cropped img size and stride
+                with open('../SplitData/COCO/meta_dict.json') as json_file:
+                    meta_sizes = json.load(json_file)
+                size_minus_stride = meta_sizes[full_img_ortho_name][0] - meta_sizes[full_img_ortho_name][0]
+
+                # converting to orthophoto scale
+                ortho_x, ortho_y = cropped_px[0] + (img_col*size_minus_stride), \
+                                   cropped_px[1] + (img_row*size_minus_stride)
+
+                # fetch respective ortho metdata
+                # structure: metadata[0]    == x-pixel res
+                #            metadata[1:3]  == rotational components
+                #            metadata[3]    == y-pixel res
+                #            metadata[4]    == Easting of upper left pixel
+                #            metadata[5]    == Northing of upper left pixel
+                ortho_dir = os.path.join("../OrthoData/metadata", \
+                            img_ortho + ".tfw")
+                f = open(ortho_dir, "r")
+                metadata = f.read().split("\n")[:-1]
+                f.close()
+
+                x_res, y_res, easting, northing = \
+                        float(metadata[0]), float(metadata[3]), \
+                        float(metadata[4]), float(metadata[5])
+
+                if img_ortho not in coords.keys():
+                    coords[img_ortho] = []
+                coords[img_ortho].append([pascal_classes[j], score,
+                        easting + (ortho_x*x_res), northing + (ortho_y*y_res)])
+
+        # ortho this photo belongs to
+        img_name = coords.keys()[0]
+
+        # convert utm to lat long
+        for pnt in range(len(coords[img_name])):
+            lat_long = utm.to_latlon(coords[img_name][pnt][2], coords[img_name][pnt][3], 18, 'T')
+            coords[img_name][pnt].extend(lat_long)
+
+        # coords for each ortho
+        indv_ortho_file = 'faster_rcnn_r101_fpn_1x_coco_results/' + img_name + '_coords.csv'
+        with open(indv_ortho_file, 'a+', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            # if file is empty, write heading then append, else just append
+            if os.stat(file_path).st_size == 0:
+                writer.writerow(["Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
+            for c in coords[img_name]:
+                writer.writerow(c[:])
+
+        # all coords from all orthos
+        with open('faster_rcnn_r101_fpn_1x_coco_results/all_coords.csv', 'a+', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            # if file is empty, write heading then append, else just append
+            if os.stat(file_path).st_size == 0:
+                writer.writerow(["Photo", "Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
+            for c in coords[img_name]:
+                writer.writerow([img_name] + c[:])
+
         # draw bounding boxes
         img = imshow_det_bboxes(
             img,
