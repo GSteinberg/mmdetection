@@ -341,7 +341,7 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
             show = False
 
         coords = {}
-        for bbox in bboxes:
+        for idx, bbox in enumerate(bboxes):
             # if score is greater than score threshold
             if bbox[4] > score_thr:
                 # row and col of image in respective orthophoto (img_ortho)
@@ -383,7 +383,7 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
 
                 if img_ortho not in coords.keys():
                     coords[img_ortho] = []
-                coords[img_ortho].append([pascal_classes[j], score,
+                coords[img_ortho].append([labels[idx], score,
                         easting + (ortho_x*x_res), northing + (ortho_y*y_res)])
 
         if coords:
