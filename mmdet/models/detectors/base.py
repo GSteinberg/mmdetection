@@ -314,7 +314,7 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
         Returns:
             img (Tensor): Only if not `show` or `out_file`
         """
-        if isinstance(img, string):
+        if isinstance(img, str):
             img_name = img.split("/")[-1]
         else:
             img_name = out_file.split("/")[-1]
