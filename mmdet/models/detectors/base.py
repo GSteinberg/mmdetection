@@ -6,6 +6,7 @@ import mmcv
 import numpy as np
 import os
 import json
+import utm
 import torch
 import torch.distributed as dist
 import torch.nn as nn
@@ -388,7 +389,7 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
 
         if coords:
             # ortho this photo belongs to
-            img_name = coords.keys()[0]
+            img_name = [*coords][0]
 
             # convert utm to lat long
             for pnt in range(len(coords[img_name])):
@@ -400,16 +401,17 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
             with open(indv_ortho_file, 'a+', newline='') as csvfile:
                 writer = csv.writer(csvfile)
                 # if file is empty, write heading then append, else just append
-                if os.stat(file_path).st_size == 0:
+                if os.stat(indv_ortho_file).st_size == 0:
                     writer.writerow(["Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
                 for c in coords[img_name]:
                     writer.writerow(c[:])
 
             # all coords from all orthos
-            with open('faster_rcnn_r101_fpn_1x_coco_results/all_coords.csv', 'a+', newline='') as csvfile:
+            all_coords_file = 'faster_rcnn_r101_fpn_1x_coco_results/all_coords.csv'
+            with open(all_coords_file, 'a+', newline='') as csvfile:
                 writer = csv.writer(csvfile)
                 # if file is empty, write heading then append, else just append
-                if os.stat(file_path).st_size == 0:
+                if os.stat(all_coords_file).st_size == 0:
                     writer.writerow(["Photo", "Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
                 for c in coords[img_name]:
                     writer.writerow([img_name] + c[:])
