@@ -314,7 +314,10 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
         Returns:
             img (Tensor): Only if not `show` or `out_file`
         """
-        img_name = img.split("/")[-1]
+        if isinstance(img, string):
+            img_name = img.split("/")[-1]
+        else:
+            img_name = out_file.split("/")[-1]
         img = mmcv.imread(img)
         img = img.copy()
         if isinstance(result, tuple):
