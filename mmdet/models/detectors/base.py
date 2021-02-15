@@ -350,20 +350,20 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
             if bbox[4] > score_thr:
                 # row and col of image in respective orthophoto (img_ortho)
                 split_img_name = img_name.split("_Split")
-                img_row, img_col = int(split_img_name[1][:2]), int(split_img_name[1][2:4])
+                img_row, img_col = int(split_img_name[1][:3]), int(split_img_name[1][3:6])
                 img_ortho = split_img_name[0]
                 full_img_ortho_name = img_ortho + ".tif"
             
                 # 2 elemt list of pixel of center of landmine
                 # structure: [average(xmin, xmax), average(ymin, ymax)]
-                cropped_px = [ int((int(bbox[0]) + int(bbox[2])) / 2),
-                               int((int(bbox[1]) + int(bbox[3])) / 2) ]
+                cropped_px = [ int( np.mean([int(bbox[0]),int(bbox[2])]) ),
+                               int( np.mean([int(bbox[1]),int(bbox[3])]) ) ]
                 score = float(bbox[4])
 
                 # getting cropped img size and stride
                 with open('../SplitData/COCO/meta_dict.json') as json_file:
                     meta_sizes = json.load(json_file)
-                size_minus_stride = meta_sizes[full_img_ortho_name][0] - meta_sizes[full_img_ortho_name][0]
+                size_minus_stride = meta_sizes[full_img_ortho_name][0] - meta_sizes[full_img_ortho_name][1]
 
                 # converting to orthophoto scale
                 ortho_x, ortho_y = cropped_px[0] + (img_col*size_minus_stride), \
