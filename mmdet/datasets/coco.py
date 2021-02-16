@@ -488,6 +488,10 @@ class CocoDataset(CustomDataset):
                         f'{cocoEval.stats[coco_metric_names[item]]:.3f}')
                     eval_results[item] = val
             else:
+                import pdb;pdb.set_trace()
+                gts=cocoGt.loadAnns(cocoGt.getAnnIds(imgIds=p.imgIds, catIds=p.catIds))
+                dts=cocoDt.loadAnns(cocoDt.getAnnIds(imgIds=p.imgIds, catIds=p.catIds))
+
                 cocoEval.evaluate()
                 cocoEval.accumulate()
                 cocoEval.summarize()
