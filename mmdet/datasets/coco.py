@@ -489,8 +489,10 @@ class CocoDataset(CustomDataset):
                     eval_results[item] = val
             else:
                 import pdb;pdb.set_trace()
-                gts=cocoGt.loadAnns(cocoGt.getAnnIds(imgIds=p.imgIds, catIds=p.catIds))
-                dts=cocoDt.loadAnns(cocoDt.getAnnIds(imgIds=p.imgIds, catIds=p.catIds))
+                imgIds = sorted(cocoGt.getImgIds())
+                catIds = sorted(cocoGt.getCatIds())
+                gts=cocoGt.loadAnns(cocoGt.getAnnIds(imgIds=imgIds, catIds=catIds))
+                dts=cocoDt.loadAnns(cocoDt.getAnnIds(imgIds=imgIds, catIds=catIds))
 
                 cocoEval.evaluate()
                 cocoEval.accumulate()
