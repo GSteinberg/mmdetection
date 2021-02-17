@@ -3,6 +3,7 @@ import logging
 import os.path as osp
 import tempfile
 from collections import OrderedDict
+import json
 
 import mmcv
 import numpy as np
@@ -491,9 +492,59 @@ class CocoDataset(CustomDataset):
                 import pdb;pdb.set_trace()
                 imgIds = sorted(cocoGt.getImgIds())
                 catIds = sorted(cocoGt.getCatIds())
+                num_classes = len(catIds)
                 gts=cocoGt.loadAnns(cocoGt.getAnnIds(imgIds=imgIds, catIds=catIds))
                 dts=cocoDt.loadAnns(cocoDt.getAnnIds(imgIds=imgIds, catIds=catIds))
 
+                # get center pxl for each ground truth box
+                cntr_gts = [[] for _ in range(num_classes)]
+                for gt in gts:
+                    gt_catId = gt['category_id']
+                    gt_box = gt['segmentation'][0][:2] + gt['segmentation'][0][4:6]
+                    cntr_gts[gt_catId].append(
+                            (np.mean([gt_box[0], gt_box[2]]), np.mean([gt_box[1], gt_box[3]])))
+
+                # get center pxl for each detected box
+                score_thr = 0.4
+                cntr_dts = [[] for _ in range(num_classes)]
+                for dt in dts:
+                    dt_catId = dt['category_id']
+                    dt_box = dt['segmentation'][0][:2] + dt['segmentation'][0][4:6]
+                    # if score for that box > prediction threshold
+                    if dt['score'] > score_thr:
+                        cntr_dts[dt_catId].append(
+                                (np.mean([dt_box[0], dt_box[2]]), np.mean([dt_box[1], dt_box[3]])))
+
+                # compute metrics
+                raw_error = [{"tp":0, "fp":0, "tn":-1, "fn":0} for _ in range()]
+                for cat in catIds:
+                    for dt in cntr_dts[cat]:
+                        min_dist = 8.5      # between points
+                        uniq_preds = 0      # for predicted box
+
+                        # VALIDATION
+                        match = False
+                        # for ground truth box of category cat
+                        for gt in cntr_gts[cat]:
+                            dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(dt,gt)]))
+                            # TP: pred px matches ground truth px only once
+                            if dist < min_dist and not match: 
+                                raw_error[cat]['tp'] += 1
+                                uniq_preds += 1
+                                match = True
+                            # FP: duplicate pred boxes
+                            elif dist < min_dist and match:
+                                raw_error[cat]['fp'] += 1
+                        
+                        # FP: no truth box to match pred box
+                        if not match: 
+                            raw_error[cat]['fp'] += 1
+                    
+                    # FN: if # accurately predicted boxes < total # ground truths 
+                    if uniq_preds < len(cntr_gts[cat]):
+                        raw_error[cat]['fn'] += len(cntr_gts[cat]) - uniq_preds
+
+                # compute coco metrics
                 cocoEval.evaluate()
                 cocoEval.accumulate()
                 cocoEval.summarize()
