@@ -4,6 +4,7 @@ import os.path as osp
 import tempfile
 from collections import OrderedDict
 import json
+import math
 
 import mmcv
 import numpy as np
@@ -489,7 +490,6 @@ class CocoDataset(CustomDataset):
                         f'{cocoEval.stats[coco_metric_names[item]]:.3f}')
                     eval_results[item] = val
             else:
-                import pdb;pdb.set_trace()
                 imgIds = sorted(cocoGt.getImgIds())
                 catIds = sorted(cocoGt.getCatIds())
                 num_classes = len(catIds)
@@ -516,7 +516,7 @@ class CocoDataset(CustomDataset):
                                 (np.mean([dt_box[0], dt_box[2]]), np.mean([dt_box[1], dt_box[3]])))
 
                 # compute metrics
-                raw_error = [{"tp":0, "fp":0, "tn":-1, "fn":0} for _ in range()]
+                raw_error = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
                 for cat in catIds:
                     for dt in cntr_dts[cat]:
                         min_dist = 8.5      # between points
