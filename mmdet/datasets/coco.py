@@ -500,37 +500,44 @@ class CocoDataset(CustomDataset):
                 cntr_gts = [[] for _ in range(num_classes)]
                 for gt in gts:
                     gt_catId = gt['category_id']
+                    gt_imgId = gt['image_id']
                     gt_box = gt['segmentation'][0][:2] + gt['segmentation'][0][4:6]
                     cntr_gts[gt_catId].append(
-                            (np.mean([gt_box[0], gt_box[2]]), np.mean([gt_box[1], gt_box[3]])))
+                            (gt_imgId, np.mean([gt_box[0], gt_box[2]]), np.mean([gt_box[1], gt_box[3]])))
 
                 # get center pxl for each detected box
                 score_thr = 0.4
                 cntr_dts = [[] for _ in range(num_classes)]
                 for dt in dts:
                     dt_catId = dt['category_id']
+                    dt_imgId = dt['image_id']
                     dt_box = dt['segmentation'][0][:2] + dt['segmentation'][0][4:6]
                     # if score for that box > prediction threshold
                     if dt['score'] > score_thr:
                         cntr_dts[dt_catId].append(
-                                (np.mean([dt_box[0], dt_box[2]]), np.mean([dt_box[1], dt_box[3]])))
+                                (dt_imgId, np.mean([dt_box[0], dt_box[2]]), np.mean([dt_box[1], dt_box[3]])))
 
                 # compute metrics
                 raw_error = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
                 for cat in catIds:
                     for dt in cntr_dts[cat]:
-                        min_dist = 8.5      # between points
-                        uniq_preds = 0      # for predicted box
-
-                        # VALIDATION
+                        min_dist = 8.5      # dist between points
+                        acc_preds = 0       # accurate predictions over entire category
                         match = False
-                        # for ground truth box of category cat
+
+                        # for ground truth box of category cat for same image
                         for gt in cntr_gts[cat]:
-                            dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(dt,gt)]))
+                            # if gt and dt are not in the same image, skip this gt
+                            if gt[0] != dt[0]: continue
+
+                            # in same image
+                            dt_cnt = dt[1:]
+                            gt_cnt = gt[1:]
+                            dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(dt_cnt,gt_cnt)]))
                             # TP: pred px matches ground truth px only once
                             if dist < min_dist and not match: 
                                 raw_error[cat]['tp'] += 1
-                                uniq_preds += 1
+                                acc_preds += 1
                                 match = True
                             # FP: duplicate pred boxes
                             elif dist < min_dist and match:
@@ -541,8 +548,8 @@ class CocoDataset(CustomDataset):
                             raw_error[cat]['fp'] += 1
                     
                     # FN: if # accurately predicted boxes < total # ground truths 
-                    if uniq_preds < len(cntr_gts[cat]):
-                        raw_error[cat]['fn'] += len(cntr_gts[cat]) - uniq_preds
+                    if acc_preds < len(cntr_gts[cat]):
+                        raw_error[cat]['fn'] += len(cntr_gts[cat]) - acc_preds
 
                 # compute coco metrics
                 cocoEval.evaluate()
