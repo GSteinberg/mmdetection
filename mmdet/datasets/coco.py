@@ -5,6 +5,7 @@ import tempfile
 from collections import OrderedDict
 import json
 import math
+import csv
 
 import mmcv
 import numpy as np
@@ -506,7 +507,7 @@ class CocoDataset(CustomDataset):
                             (gt_imgId, np.mean([gt_box[0], gt_box[2]]), np.mean([gt_box[1], gt_box[3]])))
 
                 # get center pxl for each detected box
-                score_thr = 0.4
+                score_thr = 0.925
                 cntr_dts = [[] for _ in range(num_classes)]
                 for dt in dts:
                     dt_catId = dt['category_id']
@@ -519,9 +520,9 @@ class CocoDataset(CustomDataset):
 
                 # compute metrics
                 raw_err = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
+                min_dist = 8.5      # dist between points
                 for cat in catIds:
                     for dt in cntr_dts[cat]:
-                        min_dist = 8.5      # dist between points
                         match = False       # prevent duplicate matches
 
                         # for ground truth box of category cat for same image
@@ -548,7 +549,7 @@ class CocoDataset(CustomDataset):
                     # FN: if # accurately predicted boxes < total # ground truths 
                     if raw_err[cat]['tp'] < len(cntr_gts[cat]):
                         raw_err[cat]['fn'] += len(cntr_gts[cat]) - raw_err[cat]['tp']
-
+                
                 # calculate precision, recall, F1 for each class and all classes
                 rel_err = [{"prec":0, "recall":0, "f1":0} for _ in range(num_classes)]
                 for c in range(num_classes):
@@ -566,12 +567,17 @@ class CocoDataset(CustomDataset):
                 for key in rel_total.keys():
                     rel_total[key] = np.mean([rel_err[c][key] for c in range(num_classes)])
 
+                # add totals
                 rel_err.append(rel_total)
+                raw_total = {'tp':0, 'fp':0, 'fn':0}
+                for key in raw_total.keys():
+                    raw_total[key] = sum(raw_err[c][key] for c in range(num_classes))
+                raw_err.append(raw_total)
 
                 with open("faster_rcnn_r101_fpn_1x_coco_results/error_report.csv","w", newline='') as f:
                     writer = csv.writer(f)
 
-                    writer.writerow(["----"] + catIds + ["total"])
+                    writer.writerow(["--"] + catIds + ["total"])
                     for key in raw_err[0].keys():
                         writer.writerow([key] + [raw_err[i][key] for i in range(len(raw_err))])
                     writer.writerow(['----'])
