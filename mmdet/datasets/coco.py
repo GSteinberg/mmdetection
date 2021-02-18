@@ -549,6 +549,35 @@ class CocoDataset(CustomDataset):
                     if raw_err[cat]['tp'] < len(cntr_gts[cat]):
                         raw_err[cat]['fn'] += len(cntr_gts[cat]) - raw_err[cat]['tp']
 
+                # calculate precision, recall, F1 for each class and all classes
+                rel_err = [{"prec":0, "recall":0, "f1":0} for _ in range(num_classes)]
+                for c in range(num_classes):
+                    # precision - tp/(tp+fp)
+                    rel_err[c]['prec'] = raw_err[c]['tp'] / (raw_err[c]['tp']+raw_err[c]['fp'])
+                    # recall - tp/(tp+fn)
+                    rel_err[c]['recall'] = raw_err[c]['tp'] / (raw_err[c]['tp']+raw_err[c]['fn'])
+                    # f1 - 2*[(prec*rec)/(prec+rec)]
+                    rel_err[c]['f1'] = 2 * \
+                            ((rel_err[c]['prec'] * rel_err[c]['recall']) / \
+                             (rel_err[c]['prec'] + rel_err[c]['recall']))
+
+                # average prec, recall, f1
+                rel_total = {"prec":0, "recall":0, "f1":0}
+                for key in rel_total.keys():
+                    rel_total[key] = np.mean([rel_err[c][key] for c in range(num_classes)])
+
+                rel_err.append(rel_total)
+
+                with open("faster_rcnn_r101_fpn_1x_coco_results/error_report.csv","w", newline='') as f:
+                    writer = csv.writer(f)
+
+                    writer.writerow(["----"] + catIds + ["total"])
+                    for key in raw_err[0].keys():
+                        writer.writerow([key] + [raw_err[i][key] for i in range(len(raw_err))])
+                    writer.writerow(['----'])
+                    for key in rel_err[0].keys():
+                        writer.writerow([key] + [rel_err[i][key] for i in range(len(rel_err))])
+
                 # compute coco metrics
                 cocoEval.evaluate()
                 cocoEval.accumulate()
