@@ -518,12 +518,11 @@ class CocoDataset(CustomDataset):
                                 (dt_imgId, np.mean([dt_box[0], dt_box[2]]), np.mean([dt_box[1], dt_box[3]])))
 
                 # compute metrics
-                raw_error = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
+                raw_err = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
                 for cat in catIds:
                     for dt in cntr_dts[cat]:
                         min_dist = 8.5      # dist between points
-                        acc_preds = 0       # accurate predictions over entire category
-                        match = False
+                        match = False       # prevent duplicate matches
 
                         # for ground truth box of category cat for same image
                         for gt in cntr_gts[cat]:
@@ -536,20 +535,19 @@ class CocoDataset(CustomDataset):
                             dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(dt_cnt,gt_cnt)]))
                             # TP: pred px matches ground truth px only once
                             if dist < min_dist and not match: 
-                                raw_error[cat]['tp'] += 1
-                                acc_preds += 1
+                                raw_err[cat]['tp'] += 1
                                 match = True
                             # FP: duplicate pred boxes
                             elif dist < min_dist and match:
-                                raw_error[cat]['fp'] += 1
+                                raw_err[cat]['fp'] += 1
                         
                         # FP: no truth box to match pred box
                         if not match: 
-                            raw_error[cat]['fp'] += 1
+                            raw_err[cat]['fp'] += 1
                     
                     # FN: if # accurately predicted boxes < total # ground truths 
-                    if acc_preds < len(cntr_gts[cat]):
-                        raw_error[cat]['fn'] += len(cntr_gts[cat]) - acc_preds
+                    if raw_err[cat]['tp'] < len(cntr_gts[cat]):
+                        raw_err[cat]['fn'] += len(cntr_gts[cat]) - raw_err[cat]['tp']
 
                 # compute coco metrics
                 cocoEval.evaluate()
