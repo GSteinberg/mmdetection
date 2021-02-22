@@ -370,7 +370,7 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
                 ymin_p = bbox[1] + (img_col*size_minus_stride)
                 xmax_p = bbox[2] + (img_col*size_minus_stride)
                 ymax_p = bbox[3] + (img_col*size_minus_stride)
-                print("{} {} {} {} {} {}".format(img_ortho, xmin_p, ymin_p, xmax_p, ymax_p, labels[idx]))
+                print("{}.tif {} {} {} {} {}".format(img_ortho, xmin_p, ymin_p, xmax_p, ymax_p, labels[idx]))
 
                 # converting to orthophoto scale
                 ortho_x, ortho_y = cropped_px[0] + (img_col*size_minus_stride), \
