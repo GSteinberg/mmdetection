@@ -365,6 +365,13 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
                     meta_sizes = json.load(json_file)
                 size_minus_stride = meta_sizes[full_img_ortho_name][0] - meta_sizes[full_img_ortho_name][1]
 
+                # print for drawing on ortho
+                xmin_p = bbox[0] + (img_col*size_minus_stride)
+                ymin_p = bbox[1] + (img_col*size_minus_stride)
+                xmax_p = bbox[2] + (img_col*size_minus_stride)
+                ymax_p = bbox[3] + (img_col*size_minus_stride)
+                print("{} {} {} {} {} {}".format(img_ortho, xmin_p, ymin_p, xmax_p, ymax_p, labels[idx]))
+
                 # converting to orthophoto scale
                 ortho_x, ortho_y = cropped_px[0] + (img_col*size_minus_stride), \
                                    cropped_px[1] + (img_row*size_minus_stride)
