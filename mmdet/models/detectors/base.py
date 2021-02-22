@@ -367,9 +367,9 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
 
                 # print for drawing on ortho
                 xmin_p = bbox[0] + (img_col*size_minus_stride)
-                ymin_p = bbox[1] + (img_col*size_minus_stride)
+                ymin_p = bbox[1] + (img_row*size_minus_stride)
                 xmax_p = bbox[2] + (img_col*size_minus_stride)
-                ymax_p = bbox[3] + (img_col*size_minus_stride)
+                ymax_p = bbox[3] + (img_row*size_minus_stride)
                 print("{}.tif {} {} {} {} {}".format(img_ortho, xmin_p, ymin_p, xmax_p, ymax_p, labels[idx]))
 
                 # converting to orthophoto scale

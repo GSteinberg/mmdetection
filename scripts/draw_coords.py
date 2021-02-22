@@ -26,7 +26,7 @@ for ortho in data.keys():
     for elmt in data[ortho]:
         tlx, tly, brx, bry = elmt[:-1]
         caption = str(elmt[-1])
-        vis_utils.draw_bounding_box_on_image(img, tly, tlx, brx, bry,
+        vis_utils.draw_bounding_box_on_image(img, tly, tlx, bry, brx,
                 display_str_list = [caption],
                 use_normalized_coordinates=False)
 
