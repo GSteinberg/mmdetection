@@ -23,10 +23,10 @@ with open(coord_file) as f:
 
 for ortho in data.keys():
     img = Image.open(os.path.join(ortho_dir, ortho))
-    for idx, elmt in enumerate(data[ortho]):
-        tlx, tly, w, h = elmt[:-1]
+    for elmt in data[ortho]:
+        tlx, tly, brx, bry = elmt[:-1]
         caption = str(elmt[-1])
-        vis_utils.draw_bounding_box_on_image(img, tly, tlx, tly+h, tlx+w,
+        vis_utils.draw_bounding_box_on_image(img, tly, tlx, brx, bry,
                 display_str_list = [caption],
                 use_normalized_coordinates=False)
 
