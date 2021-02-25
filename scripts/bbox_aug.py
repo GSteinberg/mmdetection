@@ -45,8 +45,10 @@ def augment(input_dir, output_dir):
     with open(ann_name) as json_file:
         annot = json.load(json_file)
 
+    # for new images
+    new_annot = {'images':[], 'annotations':[], 'categories':[]}
+
     # iterate through every image in input_dirs
-    new_annot = []
     for image in os.scandir(input_dir):
         # only check images with correct extension
         if not image.name.endswith(".tif"):
@@ -82,11 +84,9 @@ def augment(input_dir, output_dir):
         output_img_name = os.path.join(output_dir, "Aug_" + image.name)
         cv2.imwrite(output_img_name, transformed_img)
 
-        # recompile coco anns
-        new_annot.append(transformed_bboxes)
-
-    # constructing new annot
-    
+        # reconstruct new coco ann
+        transformed_bboxes
+        output_img_name
 
     # annotation output
     output_ann_name = os.path.join(output_dir, "coco_annotation.json")
