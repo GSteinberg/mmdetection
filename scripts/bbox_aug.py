@@ -19,6 +19,10 @@ def parse_args():
     return args
 
 
+def get_annot_for_img(img_name, annot):
+    pass
+
+
 def augment(input_dirs, output_dir):
     # iterate through every input img directory
     for dir_num, input_dir in enumerate(input_dirs):
@@ -28,26 +32,37 @@ def augment(input_dirs, output_dir):
             annot = json.load(json_file)
 
         # iterate through every image in input_dirs
-        for image_name in os.scandir(input_dir):
+        for image in os.scandir(input_dir):
             # only check images with correct extension
             if not image.name.endswith(".tif"):
                 print('{} not being parsed - does not have .tif extension'.format(image.name))
                 continue
 
+            # load image
             img = cv2.imread(image.path)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
+            # get corresponding annotation
+            bboxes = get_annot_for_img(image.name, annot)
+
+            # create transform object
             transform = A.Compose([
                 A.RandomCrop(width=450, height=450),
                 A.HorizontalFlip(p=0.5),
-                A.RandomBrightnessContrast(p=0.2),
-            ],  bbox_params=A.BboxParams(
+                A.RandomBrightnessContrast(p=0.2)
+            ],
+                bbox_params=A.BboxParams(
                     format='coco',
                     min_area=600,
                     min_visibility=0.4,
                     label_fields=['class_labels']
                 )
             )
+
+            # do actual transformation
+            transformed = transform(image=img, bboxes=bboxes)
+            transformed_img = transformed['image']
+            transformed_bboxes = transformed['bboxes']
 
 
 if __name__ == '__main__':
