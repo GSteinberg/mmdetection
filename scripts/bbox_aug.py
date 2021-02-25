@@ -20,7 +20,23 @@ def parse_args():
 
 
 def get_annot_for_img(img_name, annot):
-    pass
+    # get image id associated with name
+    img_id = -1
+    for img in annot['images']:
+        if 'file_name' == img_name:
+            img_id = img['id']
+
+    bboxes = []
+    for ann in annot['annotations']:
+        if ann['image_id'] == img_id:
+            # get category name
+            cat_id = ann['category_id']
+            cat = annot['categories'][cat_id]
+
+            # append entry
+            bboxes.append(ann['bbox'] + cat)
+
+    return bboxes
 
 
 def augment(input_dirs, output_dir):
