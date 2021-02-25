@@ -582,7 +582,7 @@ class CocoDataset(CustomDataset):
                         writer.writerow([key] + [raw_err[i][key] for i in range(len(raw_err))])
                     writer.writerow(['----'])
                     for key in rel_err[0].keys():
-                        writer.writerow([key] + [rel_err[i][key] for i in range(len(rel_err))])
+                        writer.writerow([key] + ["{:.4f}".format(rel_err[i][key]) for i in range(len(rel_err))])
 
                 # compute coco metrics
                 cocoEval.evaluate()
