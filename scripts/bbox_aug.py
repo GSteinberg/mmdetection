@@ -2,6 +2,7 @@ import albumentations as A
 import cv2
 import argparse
 import os
+import json
 
 def parse_args():
     """
@@ -20,9 +21,14 @@ def parse_args():
 
 def augment(input_dirs, output_dir):
     # iterate through every input img directory
-    for dir_num, input_imgs in enumerate(input_dirs):
+    for dir_num, input_dir in enumerate(input_dirs):
+        # load coco annotations
+        ann_name = os.path.join(input_dir, "coco_annotation.json")
+        with open(ann_name) as json_file:
+            annot = json.load(json_file)
+
         # iterate through every image in input_dirs
-        for image_name in os.scandir(input_imgs):
+        for image_name in os.scandir(input_dir):
             # only check images with correct extension
             if not image.name.endswith(".tif"):
                 print('{} not being parsed - does not have .tif extension'.format(image.name))
