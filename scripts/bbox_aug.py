@@ -23,10 +23,11 @@ def get_annot_for_img(img_name, annot):
     # get image id associated with name
     img_id = -1
     for img in annot['images']:
-        if 'file_name' == img_name:
+        if img['file_name'] == img_name:
             img_id = img['id']
 
     bboxes = []
+    cats = []
     for ann in annot['annotations']:
         if ann['image_id'] == img_id:
             # get category name
@@ -34,9 +35,10 @@ def get_annot_for_img(img_name, annot):
             cat = annot['categories'][cat_id]
 
             # append entry
-            bboxes.append(ann['bbox'] + cat)
+            bboxes.append(ann['bbox'])
+            cats.append(cat)
 
-    return bboxes
+    return bboxes, cats
 
 
 def augment(input_dir, output_dir):
@@ -62,7 +64,7 @@ def augment(input_dir, output_dir):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         # get corresponding annotation
-        bboxes = get_annot_for_img(image.name, annot)
+        bboxes, cats = get_annot_for_img(image.name, annot)
 
         # create transform objects
         transform_lst = []
@@ -74,40 +76,55 @@ def augment(input_dir, output_dir):
                 bbox_params=A.BboxParams(
                     format='coco',
                     min_area=600,
-                    min_visibility=0.4
+                    min_visibility=0.4,
+                    label_fields=['class_categories']
                 )
             )
         )
 
         # do actual transformations
         for tr_idx, tr in enumerate(transform_lst):
-            transformed = tr(image=img, bboxes=bboxes)
+            transformed = tr(image=img, bboxes=bboxes, class_categories=cats)
             transformed_img = transformed['image']
             transformed_bboxes = transformed['bboxes']
+            transformed_cats = transformed['class_categories']
 
             # image output
             output_img_name = os.path.join(output_dir, "Aug{:02d}_{}".format(tr_idx, image.name))
             cv2.imwrite(output_img_name, transformed_img)
 
             # reconstruct new coco ann
+            # image entry
+            img_height, img_width = transformed_img.shape[:2]
             new_annot['images'].append({
                 'id': img_id,
                 'file_name': output_img_name,
-                # 'height': #?#,
-                # 'width': #?#
+                'height': img_height,
+                'width': img_width
             })
 
-            for box in transformed_bboxes:
+            # annotation entry
+            for i, box in enumerate(transformed_bboxes):
+                import pdb;pdb.set_trace()
+                x1, y1, x2, y2 = box
+                bbox_width = x2 - x1
+                bbox_height = y2 - y1
+                area = bbox_width * bbox_height
+                seg = [[x1,y1 , x2,y1 , x2,y2 , x1,y2]]
+
                 annot['annotations'].append({
                       'image_id': img_id,
                       'id': box_id,
-                      # 'category_id': box.cat_id,
+                      'category_id': transformed_cats[i]['id'],
                       'bbox': box,
-                      # 'area': #?#,
-                      # 'segmentation': #?#,
+                      'area': area,
+                      'segmentation': seg,
                       'iscrowd': 0
                 })
                 box_id+=1
+
+            # categories entry sth w/ sets?
+
 
             img_id+=1
             
