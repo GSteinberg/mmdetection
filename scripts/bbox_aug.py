@@ -47,6 +47,7 @@ def augment(input_dir, output_dir):
 
     # for new images
     new_annot = {'images':[], 'annotations':[], 'categories':[]}
+    img_id = -1
 
     # iterate through every image in input_dirs
     for image in os.scandir(input_dir):
@@ -85,7 +86,7 @@ def augment(input_dir, output_dir):
         cv2.imwrite(output_img_name, transformed_img)
 
         # reconstruct new coco ann
-        transformed_bboxes
+        new_annot['images']transformed_bboxes
         output_img_name
 
     # annotation output
