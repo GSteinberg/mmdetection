@@ -47,7 +47,8 @@ def augment(input_dir, output_dir):
 
     # for new images
     new_annot = {'images':[], 'annotations':[], 'categories':[]}
-    img_id = -1
+    img_id = 0
+    box_id = 0
 
     # iterate through every image in input_dirs
     for image in os.scandir(input_dir):
@@ -63,31 +64,53 @@ def augment(input_dir, output_dir):
         # get corresponding annotation
         bboxes = get_annot_for_img(image.name, annot)
 
-        # create transform object
-        transform = A.Compose([
-            A.RandomCrop(width=450, height=450),
-            A.HorizontalFlip(p=0.5),
-            A.RandomBrightnessContrast(p=0.2)
-        ],
-            bbox_params=A.BboxParams(
-                format='coco',
-                min_area=600,
-                min_visibility=0.4
+        # create transform objects
+        transform_lst = []
+        transform_lst.append(
+            A.Compose([
+                A.RandomCrop(width=450, height=450),
+                A.HorizontalFlip(p=0.5),
+                A.RandomBrightnessContrast(p=0.2)],
+                bbox_params=A.BboxParams(
+                    format='coco',
+                    min_area=600,
+                    min_visibility=0.4
+                )
             )
         )
 
-        # do actual transformation
-        transformed = transform(image=img, bboxes=bboxes)
-        transformed_img = transformed['image']
-        transformed_bboxes = transformed['bboxes']
+        # do actual transformations
+        for tr_idx, tr in enumerate(transform_lst):
+            transformed = tr(image=img, bboxes=bboxes)
+            transformed_img = transformed['image']
+            transformed_bboxes = transformed['bboxes']
 
-        # image output
-        output_img_name = os.path.join(output_dir, "Aug_" + image.name)
-        cv2.imwrite(output_img_name, transformed_img)
+            # image output
+            output_img_name = os.path.join(output_dir, "Aug{:02d}_{}".format(tr_idx, image.name))
+            cv2.imwrite(output_img_name, transformed_img)
 
-        # reconstruct new coco ann
-        new_annot['images']transformed_bboxes
-        output_img_name
+            # reconstruct new coco ann
+            new_annot['images'].append({
+                'id': img_id,
+                'file_name': output_img_name,
+                # 'height': #?#,
+                # 'width': #?#
+            })
+
+            for box in transformed_bboxes:
+                annot['annotations'].append({
+                      'image_id': img_id,
+                      'id': box_id,
+                      # 'category_id': box.cat_id,
+                      'bbox': box,
+                      # 'area': #?#,
+                      # 'segmentation': #?#,
+                      'iscrowd': 0
+                })
+                box_id+=1
+
+            img_id+=1
+            
 
     # annotation output
     output_ann_name = os.path.join(output_dir, "coco_annotation.json")
