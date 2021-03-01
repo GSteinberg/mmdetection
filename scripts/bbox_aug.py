@@ -100,8 +100,8 @@ def augment(input_dir, output_dir):
             transformed_cats = transformed['class_categories']
 
             # image output
-            output_img_name = os.path.join(output_dir, "Aug{:02d}_{}".format(tr_idx, image.name))
-            cv2.imwrite(output_img_name, transformed_img)
+            output_img_name = "Aug{:02d}_{}".format(tr_idx, image.name)
+            cv2.imwrite(os.path.join(output_dir, output_img_name), transformed_img)
 
             # reconstruct new coco ann
             # image entry
@@ -121,7 +121,7 @@ def augment(input_dir, output_dir):
                 area = bbox_width * bbox_height
                 seg = [[x1,y1 , x2,y1 , x2,y2 , x1,y2]]
 
-                annot['annotations'].append({
+                new_annot['annotations'].append({
                     'image_id': img_id,
                     'id': box_id,
                     'category_id': transformed_cats[i]['id'],
@@ -133,8 +133,8 @@ def augment(input_dir, output_dir):
                 box_id+=1
 
             # categories entry
-            if transformed_cats not in annot['categories']:
-                annot['categories'].append(transformed_cats)
+            if transformed_cats not in new_annot['categories']:
+                new_annot['categories'].append(transformed_cats)
 
             img_id+=1
 
