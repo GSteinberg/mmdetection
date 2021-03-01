@@ -41,6 +41,25 @@ def get_annot_for_img(img_name, annot):
     return bboxes, cats
 
 
+def albument():
+    # create transform objects
+    transform_lst = [
+        A.Compose([
+            A.RandomCrop(width=450, height=450),
+            A.HorizontalFlip(p=0.5),
+            A.RandomBrightnessContrast(p=0.2)],
+            bbox_params=A.BboxParams(
+                format='coco',
+                min_area=600,
+                min_visibility=0.4,
+                label_fields=['class_categories']
+            )
+        )
+    ]
+
+    return transform_lst
+
+
 def augment(input_dir, output_dir):
     # load coco annotations
     ann_name = os.path.join(input_dir, "coco_annotation.json")
@@ -67,20 +86,7 @@ def augment(input_dir, output_dir):
         bboxes, cats = get_annot_for_img(image.name, annot)
 
         # create transform objects
-        transform_lst = []
-        transform_lst.append(
-            A.Compose([
-                A.RandomCrop(width=450, height=450),
-                A.HorizontalFlip(p=0.5),
-                A.RandomBrightnessContrast(p=0.2)],
-                bbox_params=A.BboxParams(
-                    format='coco',
-                    min_area=600,
-                    min_visibility=0.4,
-                    label_fields=['class_categories']
-                )
-            )
-        )
+        transform_lst = albument()
 
         # do actual transformations
         for tr_idx, tr in enumerate(transform_lst):
@@ -105,7 +111,6 @@ def augment(input_dir, output_dir):
 
             # annotation entry
             for i, box in enumerate(transformed_bboxes):
-                import pdb;pdb.set_trace()
                 x1, y1, x2, y2 = box
                 bbox_width = x2 - x1
                 bbox_height = y2 - y1
@@ -113,21 +118,22 @@ def augment(input_dir, output_dir):
                 seg = [[x1,y1 , x2,y1 , x2,y2 , x1,y2]]
 
                 annot['annotations'].append({
-                      'image_id': img_id,
-                      'id': box_id,
-                      'category_id': transformed_cats[i]['id'],
-                      'bbox': box,
-                      'area': area,
-                      'segmentation': seg,
-                      'iscrowd': 0
+                    'image_id': img_id,
+                    'id': box_id,
+                    'category_id': transformed_cats[i]['id'],
+                    'bbox': box,
+                    'area': area,
+                    'segmentation': seg,
+                    'iscrowd': 0
                 })
                 box_id+=1
 
-            # categories entry sth w/ sets?
-
+            # categories entry
+            if transformed_cats not in annot['categories']:
+                annot['categories'].append(transformed_cats)
 
             img_id+=1
-            
+
 
     # annotation output
     output_ann_name = os.path.join(output_dir, "coco_annotation.json")
