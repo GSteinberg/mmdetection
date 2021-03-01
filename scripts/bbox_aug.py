@@ -3,6 +3,7 @@ import cv2
 import argparse
 import os
 import json
+from progress.bar import IncrementalBar
 
 def parse_args():
     """
@@ -42,10 +43,9 @@ def get_annot_for_img(img_name, annot):
 
 
 def albument():
-    # create transform objects
+    # decide transformations
     transform_lst = [
         A.Compose([
-            A.RandomCrop(width=450, height=450),
             A.HorizontalFlip(p=0.5),
             A.RandomBrightnessContrast(p=0.2)],
             bbox_params=A.BboxParams(
@@ -71,11 +71,18 @@ def augment(input_dir, output_dir):
     img_id = 0
     box_id = 0
 
+    # create transform objects
+    transform_lst = albument()
+
+    # for output viz
+    bar = IncrementalBar("Transforming images in " + input_dir, max=len(os.listdir(input_dir))*len(transform_lst))
+
     # iterate through every image in input_dirs
     for image in os.scandir(input_dir):
         # only check images with correct extension
         if not image.name.endswith(".tif"):
-            print('{} not being parsed - does not have .tif extension'.format(image.name))
+            print('\n{} not being parsed - does not have .tif extension'.format(image.name))
+            bar.next()
             continue
 
         # load image
@@ -84,9 +91,6 @@ def augment(input_dir, output_dir):
 
         # get corresponding annotation
         bboxes, cats = get_annot_for_img(image.name, annot)
-
-        # create transform objects
-        transform_lst = albument()
 
         # do actual transformations
         for tr_idx, tr in enumerate(transform_lst):
@@ -134,6 +138,9 @@ def augment(input_dir, output_dir):
 
             img_id+=1
 
+        bar.next()
+
+    bar.finish()
 
     # annotation output
     output_ann_name = os.path.join(output_dir, "coco_annotation.json")
