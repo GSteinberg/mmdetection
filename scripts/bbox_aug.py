@@ -115,10 +115,11 @@ def augment(input_dir, output_dir):
 
             # annotation entry
             for i, box in enumerate(transformed_bboxes):
-                x1, y1, x2, y2 = box
-                bbox_width = x2 - x1
-                bbox_height = y2 - y1
-                area = bbox_width * bbox_height
+                box = [int(coord) for coord in box]
+                x1, y1, h, w = box
+                x2 = x1 + w
+                y2 = y1 + h
+                area = h * w
                 seg = [[x1,y1 , x2,y1 , x2,y2 , x1,y2]]
 
                 new_annot['annotations'].append({
@@ -133,8 +134,9 @@ def augment(input_dir, output_dir):
                 box_id+=1
 
             # categories entry
-            if transformed_cats not in new_annot['categories']:
-                new_annot['categories'].append(transformed_cats)
+            for cat in transformed_cats:
+                if cat not in new_annot['categories']:
+                    new_annot['categories'].append(cat)
 
             img_id+=1
 
