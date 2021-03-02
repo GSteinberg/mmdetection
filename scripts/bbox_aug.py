@@ -43,17 +43,35 @@ def get_annot_for_img(img_name, annot):
 
 
 def albument():
-    # decide transformations
+    bbox_params = A.BboxParams(
+            format='coco',
+            min_area=600,
+            min_visibility=0.4,
+            label_fields=['class_categories']
+    )
+
+    # describe the transformations
     transform_lst = [
+        # Turns
         A.Compose([
-            A.HorizontalFlip(p=0.5),
-            A.RandomBrightnessContrast(p=0.2)],
-            bbox_params=A.BboxParams(
-                format='coco',
-                min_area=600,
-                min_visibility=0.4,
-                label_fields=['class_categories']
-            )
+            A.HorizontalFlip(p=0.5),        # y-axis flip
+            A.VerticalFlip(p=0.5),          # x-axis flip
+            A.Rotate(p=0.5)],               # random rotation
+            bbox_params=bbox_params
+        ),
+        # Lossy images
+        A.Compose([
+            A.ImageCompression(quality_lower=20, quality_upper=60, p=0.5),  # JPEG Compression
+            A.ISONoise(intensity=(0.5, 0.75), p=0.5)],             # camera sensor noise
+            bbox_params=bbox_params
+        ),
+        # Worse conditions
+        A.Compose([
+            A.MotionBlur(blur_limit=(5, 20), p=0.5),        # motion blur
+            A.RandomShadow(shadow_roi=(0, 0, 1, 1), num_shadows_lower=1,            # random shadows
+                           num_shadows_upper=3, shadow_dimension=5, p=0.5),
+            A.RandomBrightnessContrast(p=0.5)],             # random brightness
+            bbox_params=bbox_params
         )
     ]
 
