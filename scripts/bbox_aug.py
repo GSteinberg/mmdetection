@@ -158,7 +158,7 @@ def augment(input_dir, output_dir):
 
             img_id+=1
 
-        bar.next()
+            bar.next()
 
     bar.finish()
 
