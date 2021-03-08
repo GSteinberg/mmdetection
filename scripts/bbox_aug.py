@@ -67,10 +67,8 @@ def albument():
         ),
         # Worse conditions
         A.Compose([
-            A.MotionBlur(blur_limit=(5, 20), p=0.5),        # motion blur
-            A.RandomShadow(shadow_roi=(0, 0, 1, 1), num_shadows_lower=1,            # random shadows
-                           num_shadows_upper=3, shadow_dimension=5, p=0.5),
-            A.RandomBrightnessContrast(p=0.5)],             # random brightness
+            A.RandomBrightnessContrast(p=0.5),              # random brightness
+            A.MotionBlur(blur_limit=(3, 7), p=0.5)],        # motion blur
             bbox_params=bbox_params
         )
     ]
