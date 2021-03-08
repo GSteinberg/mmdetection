@@ -507,7 +507,7 @@ class CocoDataset(CustomDataset):
                             (gt_imgId, np.mean([gt_box[0], gt_box[2]]), np.mean([gt_box[1], gt_box[3]])))
 
                 # get center pxl for each detected box
-                score_thr = 0.925
+                score_thr = 0.995
                 cntr_dts = [[] for _ in range(num_classes)]
                 for dt in dts:
                     dt_catId = dt['category_id']
@@ -574,7 +574,8 @@ class CocoDataset(CustomDataset):
                     raw_total[key] = sum(raw_err[c][key] for c in range(num_classes))
                 raw_err.append(raw_total)
 
-                with open("faster_rcnn_r101_fpn_1x_coco_results/error_report.csv","w", newline='') as f:
+                err_report_name = "error_report_{}.csv".format(str(score_thr)[2:])
+                with open("faster_rcnn_r101_fpn_1x_coco_results/" + err_report_name,"w", newline='') as f:
                     writer = csv.writer(f)
 
                     writer.writerow(["--"] + catIds + ["total"])
