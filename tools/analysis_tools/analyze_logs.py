@@ -59,6 +59,8 @@ def plot_curve(log_dicts, args):
                 for epoch in epochs:
                     ys += log_dict[epoch][metric]
                 ax = plt.gca()
+                plt.figure(figsize=(20,20))
+                plt.grid()
                 ax.set_xticks(xs)
                 plt.xlabel('epoch')
                 plt.plot(xs, ys, label=legend[i * num_metrics + j], marker='o')
@@ -75,6 +77,8 @@ def plot_curve(log_dicts, args):
                     ys.append(np.array(log_dict[epoch][metric][:len(iters)]))
                 xs = np.concatenate(xs)
                 ys = np.concatenate(ys)
+                plt.figure(figsize=(20,20))
+                plt.grid()
                 plt.xlabel('iter')
                 plt.plot(
                     xs, ys, label=legend[i * num_metrics + j], linewidth=0.5)
