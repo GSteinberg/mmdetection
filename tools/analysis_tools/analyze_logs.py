@@ -60,7 +60,13 @@ def plot_curve(log_dicts, args):
                     ys += log_dict[epoch][metric]
                 ax = plt.gca()
                 plt.figure(figsize=(20,10))
-                plt.grid()
+                
+                plt.minorticks_on()
+                # Customize the major grid
+                plt.grid(which='major', linestyle='-', linewidth='0.5', color='black')
+                # Customize the minor grid
+                plt.grid(which='minor', linestyle=':', linewidth='0.5', color='red')
+                
                 ax.set_xticks(xs)
                 plt.xlabel('epoch')
                 plt.plot(xs, ys, label=legend[i * num_metrics + j], marker='o')
@@ -79,9 +85,13 @@ def plot_curve(log_dicts, args):
                 ys = np.concatenate(ys)
                 if j == 0: plt.figure(figsize=(20,10))
                 plt.xlabel('iter')
-                plt.plot(
-                    xs, ys, label=legend[i * num_metrics + j], linewidth=0.5)
-                plt.grid()
+                plt.plot(xs, ys, label=legend[i * num_metrics + j], linewidth=0.5)
+                
+                plt.minorticks_on()
+                # Customize the major grid
+                plt.grid(which='major', linestyle='-', linewidth='0.5', color='black')
+                # Customize the minor grid
+                plt.grid(which='minor', linestyle=':', linewidth='0.5', color='red')
             plt.legend()
         if args.title is not None:
             plt.title(args.title)
