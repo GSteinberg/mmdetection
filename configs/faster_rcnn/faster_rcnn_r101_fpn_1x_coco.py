@@ -5,7 +5,7 @@ model = dict(
     pretrained='torchvision://resnet101',
     backbone=dict(depth=101))
 
-runner = dict(type='EpochBasedRunner', max_epochs=100)
+runner = dict(type='EpochBasedRunner', max_epochs=50)
 dataset_type = 'CocoDataset'
 classes = ('pfm-1', 'ksf-casing')
 data = dict(

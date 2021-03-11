@@ -115,6 +115,7 @@ class CocoDataset(CustomDataset):
         valid_img_ids = []
         for i, img_info in enumerate(self.data_infos):
             img_id = self.img_ids[i]
+            self.filter_empty_gt = False
             if self.filter_empty_gt and img_id not in ids_in_cat:
                 continue
             if min(img_info['width'], img_info['height']) >= min_size:
@@ -507,7 +508,7 @@ class CocoDataset(CustomDataset):
                             (gt_imgId, np.mean([gt_box[0], gt_box[2]]), np.mean([gt_box[1], gt_box[3]])))
 
                 # get center pxl for each detected box
-                score_thr = 0.995
+                score_thr = 0.4
                 cntr_dts = [[] for _ in range(num_classes)]
                 for dt in dts:
                     dt_catId = dt['category_id']
