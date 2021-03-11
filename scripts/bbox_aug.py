@@ -52,11 +52,14 @@ def albument():
 
     # describe the transformations
     transform_lst = [
-        # Turns
+        # y-axis flip
         A.Compose([
-            A.HorizontalFlip(p=0.5),        # y-axis flip
-            A.VerticalFlip(p=0.5),          # x-axis flip
-            A.Rotate(p=0.5)],               # random rotation
+            A.HorizontalFlip(p=1)],         # y-axis flip
+            bbox_params=bbox_params
+        ),
+        # x-axis flip
+        A.Compose([
+            A.VerticalFlip(p=1)],           # x-axis flip
             bbox_params=bbox_params
         ),
         # Lossy images
