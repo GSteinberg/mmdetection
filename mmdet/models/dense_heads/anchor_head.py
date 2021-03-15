@@ -192,7 +192,6 @@ class AnchorHead(BaseDenseHead, BBoxTestMixin):
                     shape (num_anchors,).
             gt_bboxes (Tensor): Ground truth bboxes of the image,
                 shape (num_gts, 4).
-            img_meta (dict): Meta info of the image.
             gt_bboxes_ignore (Tensor): Ground truth bboxes to be
                 ignored, shape (num_ignored_gts, 4).
             img_meta (dict): Meta info of the image.
@@ -691,13 +690,13 @@ class AnchorHead(BaseDenseHead, BBoxTestMixin):
         if deploy_nms_pre > 0 and torch.onnx.is_in_onnx_export():
             # Get maximum scores for foreground classes.
             if self.use_sigmoid_cls:
-                batch_mlvl_scores, _ = batch_mlvl_scores.max(-1)
+                max_scores, _ = batch_mlvl_scores.max(-1)
             else:
                 # remind that we set FG labels to [0, num_class-1]
                 # since mmdet v2.0
                 # BG cat_id: num_class
-                batch_mlvl_scores, _ = batch_mlvl_scores[..., :-1].max(-1)
-            _, topk_inds = batch_mlvl_scores.topk(deploy_nms_pre)
+                max_scores, _ = batch_mlvl_scores[..., :-1].max(-1)
+            _, topk_inds = max_scores.topk(deploy_nms_pre)
             batch_inds = torch.arange(batch_size).view(-1,
                                                        1).expand_as(topk_inds)
             batch_mlvl_scores = batch_mlvl_scores[batch_inds, topk_inds]
