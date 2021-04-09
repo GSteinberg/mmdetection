@@ -510,83 +510,90 @@ class CocoDataset(CustomDataset):
                             (gt_imgId, np.mean([gt_box[0], gt_box[2]]), np.mean([gt_box[1], gt_box[3]])))
 
                 # get center pxl for each detected box
-                score_thr = 0.4
-                cntr_dts = [[] for _ in range(num_classes)]
-                for dt in dts:
-                    dt_catId = dt['category_id']
-                    dt_imgId = dt['image_id']
-                    dt_box = dt['segmentation'][0][:2] + dt['segmentation'][0][4:6]
-                    # if score for that box > prediction threshold
-                    if dt['score'] > score_thr:
-                        cntr_dts[dt_catId].append(
-                                (dt_imgId, np.mean([dt_box[0], dt_box[2]]), np.mean([dt_box[1], dt_box[3]])))
+                AUC_chart = True
+                
+                for score_thr in range(0, 1, 0.1):
+                    if not AUC_chart:
+                        score_thr = 0.4
 
-                # compute metrics
-                raw_err = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
-                min_dist = 8.5      # dist between points
-                for cat in catIds:
-                    for dt in cntr_dts[cat]:
-                        match = False       # prevent duplicate matches
+                    cntr_dts = [[] for _ in range(num_classes)]
+                    for dt in dts:
+                        dt_catId = dt['category_id']
+                        dt_imgId = dt['image_id']
+                        dt_box = dt['segmentation'][0][:2] + dt['segmentation'][0][4:6]
+                        # if score for that box > prediction threshold
+                        if dt['score'] > score_thr:
+                            cntr_dts[dt_catId].append(
+                                    (dt_imgId, np.mean([dt_box[0], dt_box[2]]), np.mean([dt_box[1], dt_box[3]])))
 
-                        # for ground truth box of category cat for same image
-                        for gt in cntr_gts[cat]:
-                            # if gt and dt are not in the same image, skip this gt
-                            if gt[0] != dt[0]: continue
+                    # compute metrics
+                    raw_err = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
+                    min_dist = 8.5      # dist between points
+                    for cat in catIds:
+                        for dt in cntr_dts[cat]:
+                            match = False       # prevent duplicate matches
 
-                            # in same image
-                            dt_cnt = dt[1:]
-                            gt_cnt = gt[1:]
-                            dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(dt_cnt,gt_cnt)]))
-                            # TP: pred px matches ground truth px only once
-                            if dist < min_dist and not match: 
-                                raw_err[cat]['tp'] += 1
-                                match = True
-                            # FP: duplicate pred boxes
-                            elif dist < min_dist and match:
+                            # for ground truth box of category cat for same image
+                            for gt in cntr_gts[cat]:
+                                # if gt and dt are not in the same image, skip this gt
+                                if gt[0] != dt[0]: continue
+
+                                # in same image
+                                dt_cnt = dt[1:]
+                                gt_cnt = gt[1:]
+                                dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(dt_cnt,gt_cnt)]))
+                                # TP: pred px matches ground truth px only once
+                                if dist < min_dist and not match: 
+                                    raw_err[cat]['tp'] += 1
+                                    match = True
+                                # FP: duplicate pred boxes
+                                elif dist < min_dist and match:
+                                    raw_err[cat]['fp'] += 1
+                            
+                            # FP: no truth box to match pred box
+                            if not match: 
                                 raw_err[cat]['fp'] += 1
                         
-                        # FP: no truth box to match pred box
-                        if not match: 
-                            raw_err[cat]['fp'] += 1
+                        # FN: if # accurately predicted boxes < total # ground truths 
+                        if raw_err[cat]['tp'] < len(cntr_gts[cat]):
+                            raw_err[cat]['fn'] += len(cntr_gts[cat]) - raw_err[cat]['tp']
                     
-                    # FN: if # accurately predicted boxes < total # ground truths 
-                    if raw_err[cat]['tp'] < len(cntr_gts[cat]):
-                        raw_err[cat]['fn'] += len(cntr_gts[cat]) - raw_err[cat]['tp']
-                
-                # calculate precision, recall, F1 for each class and all classes
-                rel_err = [{"prec":0, "recall":0, "f1":0} for _ in range(num_classes)]
-                for c in range(num_classes):
-                    # precision - tp/(tp+fp)
-                    rel_err[c]['prec'] = raw_err[c]['tp'] / (raw_err[c]['tp']+raw_err[c]['fp'])
-                    # recall - tp/(tp+fn)
-                    rel_err[c]['recall'] = raw_err[c]['tp'] / (raw_err[c]['tp']+raw_err[c]['fn'])
-                    # f1 - 2*[(prec*rec)/(prec+rec)]
-                    rel_err[c]['f1'] = 2 * \
-                            ((rel_err[c]['prec'] * rel_err[c]['recall']) / \
-                             (rel_err[c]['prec'] + rel_err[c]['recall']))
+                    # calculate precision, recall, F1 for each class and all classes
+                    rel_err = [{"prec":0, "recall":0, "f1":0} for _ in range(num_classes)]
+                    for c in range(num_classes):
+                        # precision - tp/(tp+fp)
+                        rel_err[c]['prec'] = raw_err[c]['tp'] / (raw_err[c]['tp']+raw_err[c]['fp'])
+                        # recall - tp/(tp+fn)
+                        rel_err[c]['recall'] = raw_err[c]['tp'] / (raw_err[c]['tp']+raw_err[c]['fn'])
+                        # f1 - 2*[(prec*rec)/(prec+rec)]
+                        rel_err[c]['f1'] = 2 * \
+                                ((rel_err[c]['prec'] * rel_err[c]['recall']) / \
+                                 (rel_err[c]['prec'] + rel_err[c]['recall']))
 
-                # average prec, recall, f1
-                rel_total = {"prec":0, "recall":0, "f1":0}
-                for key in rel_total.keys():
-                    rel_total[key] = np.mean([rel_err[c][key] for c in range(num_classes)])
+                    # average prec, recall, f1
+                    rel_total = {"prec":0, "recall":0, "f1":0}
+                    for key in rel_total.keys():
+                        rel_total[key] = np.mean([rel_err[c][key] for c in range(num_classes)])
 
-                # add totals
-                rel_err.append(rel_total)
-                raw_total = {'tp':0, 'fp':0, 'fn':0}
-                for key in raw_total.keys():
-                    raw_total[key] = sum(raw_err[c][key] for c in range(num_classes))
-                raw_err.append(raw_total)
+                    # add totals
+                    rel_err.append(rel_total)
+                    raw_total = {'tp':0, 'fp':0, 'fn':0}
+                    for key in raw_total.keys():
+                        raw_total[key] = sum(raw_err[c][key] for c in range(num_classes))
+                    raw_err.append(raw_total)
 
-                err_report_name = "error_report_{}.csv".format(str(score_thr)[2:])
-                with open("faster_rcnn_r101_fpn_1x_coco_results/" + err_report_name,"w", newline='') as f:
-                    writer = csv.writer(f)
+                    err_report_name = "error_report_{}.csv".format(str(score_thr)[2:])
+                    with open("faster_rcnn_r101_fpn_1x_coco_results/" + err_report_name,"w", newline='') as f:
+                        writer = csv.writer(f)
 
-                    writer.writerow(["--"] + catIds + ["total"])
-                    for key in raw_err[0].keys():
-                        writer.writerow([key] + [raw_err[i][key] for i in range(len(raw_err))])
-                    writer.writerow(['----'])
-                    for key in rel_err[0].keys():
-                        writer.writerow([key] + ["{:.4f}".format(rel_err[i][key]) for i in range(len(rel_err))])
+                        writer.writerow(["--"] + catIds + ["total"])
+                        for key in raw_err[0].keys():
+                            writer.writerow([key] + [raw_err[i][key] for i in range(len(raw_err))])
+                        writer.writerow(['----'])
+                        for key in rel_err[0].keys():
+                            writer.writerow([key] + ["{:.4f}".format(rel_err[i][key]) for i in range(len(rel_err))])
+
+                    if not AUC_chart: break
 
                 # compute coco metrics
                 cocoEval.evaluate()
