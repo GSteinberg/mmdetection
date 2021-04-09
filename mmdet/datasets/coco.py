@@ -512,10 +512,11 @@ class CocoDataset(CustomDataset):
                 # get center pxl for each detected box
                 AUC_chart = True
                 
-                for score_thr in range(0, 1, 0.1):
+                for score_thr in np.arange(0, 1, 0.05):
                     if not AUC_chart:
                         score_thr = 0.4
 
+                    score_thr = np.round(score_thr, 2)
                     cntr_dts = [[] for _ in range(num_classes)]
                     for dt in dts:
                         dt_catId = dt['category_id']
