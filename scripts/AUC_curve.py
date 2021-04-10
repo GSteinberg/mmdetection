@@ -11,7 +11,9 @@ prec = []
 recall = []
 f1 = []
 
-for rep in os.scandir('../faster_rcnn_r101_fpn_1x_coco_results/num13/demo_results'): 
+INPUT_DIR = '../faster_rcnn_r101_fpn_1x_coco_results/num13/demo_results'
+
+for rep in os.scandir(INPUT_DIR):
     # checking correct file extension
     if not rep.name.endswith('.csv'):
         continue
@@ -57,29 +59,29 @@ f1_ave = [float(el[2][2]) for el in sorted_data.values()]
 threshold = [float(el) for el in sorted_data.keys()]
 
 # PLOT
-fig, (prec, reca, f1) = plt.subplots(1, 3, figsize=(20,10))
+fig, (pfm, ksf, ave) = plt.subplots(1, 3, figsize=(20,10))
 
-prec.plot(threshold, prec_ave, color='blue', label='precision ave')
-prec.plot(threshold, prec_pfm, color='red', label='precision pfm')
-prec.plot(threshold, prec_ksf, color='green', label='precision ksf')
+pfm.plot(threshold, prec_pfm, color='blue', label='pfm precision')
+pfm.plot(threshold, recall_pfm, color='red', label='pfm recall')
+pfm.plot(threshold, f1_pfm, color='green', label='pfm f1')
 
-reca.plot(threshold, recall_ave, color='blue', label='recall ave')
-reca.plot(threshold, recall_ksf, color='red', label='recall ksf')
-reca.plot(threshold, recall_pfm, color='green', label='recall pfm')
+ksf.plot(threshold, prec_ksf, color='blue', label='ksf precision')
+ksf.plot(threshold, recall_ksf, color='red', label='ksf recall')
+ksf.plot(threshold, f1_ksf, color='green', label='ksf f1')
 
-f1.plot(threshold, f1_ave, color='blue', label='f1 ave')
-f1.plot(threshold, f1_pfm, color='red', label='f1 pfm')
-f1.plot(threshold, f1_ksf, color='green', label='f1 ksf')
+ave.plot(threshold, prec_ave, color='blue', label='ave precision')
+ave.plot(threshold, recall_ave, color='red', label='ave recall')
+ave.plot(threshold, f1_ave, color='green', label='ave f1')
 
-ticks = [np.round(i, 2) for i in np.arange(0, 1.01, 0.05)]
-for ax in [prec, reca, f1]:
+ticks = [np.round(i, 2) for i in np.arange(0, 1.01, 0.1)]
+for ax in [pfm, ksf, ave]:
     ax.set_yticks(ticks)
-    ax.set_xlabel('score thresholds')
+    ax.set_xticks(ticks)
+    ax.set_xlabel('Score Thresholds')
+    ax.legend()
 
-prec.set_ylabel('precision')
-reca.set_ylabel('recall')
-f1.set_ylabel('f1')
-
-plt.legend()
+pfm.set_ylabel('PFM Metrics')
+ksf.set_ylabel('KSF Metrics')
+ave.set_ylabel('Average Metrics')
 
 plt.savefig('AUC_curve.png')
