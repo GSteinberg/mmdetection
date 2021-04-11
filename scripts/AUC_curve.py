@@ -3,6 +3,7 @@ from collections import OrderedDict
 import numpy as np
 import os
 import csv
+import sys
 
 ## Call from mmdetection/scripts ##
 
@@ -11,7 +12,8 @@ prec = []
 recall = []
 f1 = []
 
-INPUT_DIR = '../faster_rcnn_r101_fpn_1x_coco_results/num13/demo_results'
+INPUT_DIR = sys.argv[1]
+TITLE = sys.argv[2]
 
 for rep in os.scandir(INPUT_DIR):
     # checking correct file extension
@@ -83,5 +85,7 @@ for ax in [pfm, ksf, ave]:
 pfm.set_ylabel('PFM Metrics')
 ksf.set_ylabel('KSF Metrics')
 ave.set_ylabel('Average Metrics')
+
+ksf.set_title(TITLE)
 
 plt.savefig('AUC_curve.png')
