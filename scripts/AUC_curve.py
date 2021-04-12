@@ -88,4 +88,4 @@ ave.set_ylabel('Average Metrics')
 
 ksf.set_title(TITLE)
 
-plt.savefig('AUC_curve.png')
+plt.savefig(os.path.join(INPUT_DIR, 'AUC_curve_' + TITLE + '.png'))
