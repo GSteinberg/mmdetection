@@ -26,11 +26,20 @@ for curr_dir, subdirs, files in os.walk('./'):
         
         # mode: whether we are drawing rectangle or final touchup strokes
         mode = cv2.GC_INIT_WITH_RECT
+        # the # of iterations the algorithm should run
+        iterations = 10
 
         # run
-        cv2.grabCut(img, mask, rect, bgdModel, fgdModel, 10, mode)
-        mask = np.where((mask==2)|(mask==0), 0, 1).astype('uint8')
+        cv2.grabCut(img, mask, rect, bgdModel, fgdModel, iterations, mode)
+        mask2 = np.where((mask==2)|(mask==0), 0, 1).astype('uint8')
         img = img * mask2[:,:,np.newaxis]       # multiple by original image
+        
+        # black background -> transparent
+        tmp = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        _, alpha = cv2.threshold(tmp, 0, 255, cv2.THRESH_BINARY)
+        b, g, r = cv2.split(img)
+        rgba = [b, g, r, alpha]
+        img = cv2.merge(rgba, 4)
         
         # save image
         new_name = '{}/{}_Lasso.tif'.format(curr_dir, img_name.split('.')[0])
