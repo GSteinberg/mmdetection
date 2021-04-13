@@ -66,6 +66,12 @@ if __name__ == '__main__':
     ksf_imgs = [OBJ_DIR+f for f in listdir(OBJ_DIR) if isfile(join(OBJ_DIR, f)) and 'KSF' in f]
 
     for ortho in scandir(ORTHO_DIR):
+        # open orthophoto
+        bg = Image.open(ortho.path)
+        # bg_wid, bg_hei = bg.size
+        bg_wid, bg_hei = 6788, 5064
+        bg_x, bg_y = 1136, 1378
+
         # Create basic xml structure for writing
         ann = ET.Element('annotation')
         filename = ET.SubElement(ann, 'filename')
@@ -83,12 +89,6 @@ if __name__ == '__main__':
 
         # select correct amounts of pfm and ksf
         objects = random.sample(pfm_imgs, NUM_PFM) + random.sample(ksf_imgs, NUM_KSF)
-
-        # open orthophoto
-        bg = Image.open(ortho.path)
-        # bg_wid, bg_hei = bg.size
-        bg_wid, bg_hei = 6788, 5064
-        bg_x, bg_y = 1136, 1378
 
         # loop through each pfm-1
         for obj in objects:
