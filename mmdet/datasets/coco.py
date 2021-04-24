@@ -118,7 +118,7 @@ class CocoDataset(CustomDataset):
         for i, img_info in enumerate(self.data_infos):
             img_id = self.img_ids[i]
             # comment out the below line to not train on background images
-            self.filter_empty_gt = False
+            # self.filter_empty_gt = False
             if self.filter_empty_gt and img_id not in ids_in_cat:
                 continue
             if min(img_info['width'], img_info['height']) >= min_size:
@@ -563,6 +563,12 @@ class CocoDataset(CustomDataset):
                     # calculate precision, recall, F1 for each class and all classes
                     rel_err = [{"prec":0, "recall":0, "f1":0} for _ in range(num_classes)]
                     for c in range(num_classes):
+                        if raw_err[c]['tp'] == 0:
+                            rel_err[c]['prec'] = 0
+                            rel_err[c]['recall'] = 0
+                            rel_err[c]['f1'] = 0
+                            continue
+                        
                         # precision - tp/(tp+fp)
                         rel_err[c]['prec'] = raw_err[c]['tp'] / (raw_err[c]['tp']+raw_err[c]['fp'])
                         # recall - tp/(tp+fn)
