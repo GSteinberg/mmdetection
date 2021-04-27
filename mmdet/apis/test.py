@@ -20,6 +20,7 @@ def single_gpu_test(model,
                     show_score_thr=0.3):
     model.eval()
     results = []
+    raw_err = []
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
@@ -35,6 +36,12 @@ def single_gpu_test(model,
             img_metas = data['img_metas'][0].data[0]
             imgs = tensor2imgs(img_tensor, **img_metas[0]['img_norm_cfg'])
             assert len(imgs) == len(img_metas)
+
+            # prepare error dict
+            img_err_entry = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
+            ortho_name = img_metas[0]['ori_filename'].split('_Split')[0]
+            if ortho_name not in raw_err.keys():
+                raw_err.append({ortho_name : img_err_entry})
 
             for i, (img, img_meta) in enumerate(zip(imgs, img_metas)):
                 h, w, _ = img_meta['img_shape']
