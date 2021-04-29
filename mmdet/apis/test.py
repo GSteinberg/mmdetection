@@ -20,7 +20,7 @@ def single_gpu_test(model,
                     show_score_thr=0.3):
     model.eval()
     results = []
-    raw_err = []
+    pd = {}
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
@@ -37,12 +37,6 @@ def single_gpu_test(model,
             imgs = tensor2imgs(img_tensor, **img_metas[0]['img_norm_cfg'])
             assert len(imgs) == len(img_metas)
 
-            # prepare error dict
-            img_err_entry = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
-            ortho_name = img_metas[0]['ori_filename'].split('_Split')[0]
-            if ortho_name not in raw_err.keys():
-                raw_err.append({ortho_name : img_err_entry})
-
             for i, (img, img_meta) in enumerate(zip(imgs, img_metas)):
                 h, w, _ = img_meta['img_shape']
                 img_show = img[:h, :w, :]
@@ -55,12 +49,19 @@ def single_gpu_test(model,
                 else:
                     out_file = None
 
-                model.module.show_result(
+                curr_pd = model.module.show_result(
                     img_show,
                     result[i],
                     show=show,
                     out_file=out_file,
                     score_thr=show_score_thr)
+
+                # add current preds to preds
+                for ortho_name in curr_pd.keys():
+                    if ortho_name not in pd.keys():
+                        pd[ortho_name] = curr_pd[ortho_name]
+                    else:
+                        pd[ortho_name].append(curr_pd[ortho_name])
 
         # encode mask results
         if isinstance(result[0], tuple):
@@ -70,6 +71,27 @@ def single_gpu_test(model,
 
         for _ in range(batch_size):
             prog_bar.update()
+    
+    # get ground truth for ortho level eval
+    gt = {ortho_name: [] for ortho_name in pd.keys()}
+
+    for ortho_name in gt.keys():
+        tree = ET.parse(ortho_name + ".xml")
+        root = tree.getroot()
+
+        for boxes in root.iter('object'):
+            name = boxes.find("name").text
+            for box in boxes.findall("bndbox"):
+                xmin, ymin = int(box.find("xmin").text), int(box.find("ymin").text)
+                xmax, ymax = int(box.find("xmax").text), int(box.find("ymax").text)
+            
+            entry = [name, int((xmin+xmax) / 2), int((ymin+ymax) / 2)]
+            gt[ortho_name].append(entry)
+
+    # prepare error dict - 2 classes
+    img_err_entry = [{"tp":0, "fp":0, "fn":0} for _ in range(2)]
+    raw_err = {ortho_name : img_err_entry for ortho_name in gt.keys()}
+
     return results
 
 

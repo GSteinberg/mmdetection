@@ -343,6 +343,7 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
             show = False
 
         coords = {}
+        ortho_coords = {}
         for idx, bbox in enumerate(bboxes):
             # if score is greater than score threshold
             if bbox[4] > score_thr:
@@ -395,6 +396,11 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
                 coords[img_ortho].append([labels[idx], score,
                         easting + (ortho_x*x_res), northing + (ortho_y*y_res)])
 
+                # output for orthophoto level eval
+                if img_ortho not in ortho_coords.keys():
+                    ortho_coords[img_ortho] = []
+                ortho_coords[img_ortho].append([labels[idx], score, ortho_x, ortho_y])
+
         if coords:
             # ortho this photo belongs to
             img_name = [*coords][0]
@@ -444,3 +450,5 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
 
         if not (show or out_file):
             return img
+        else:
+            return ortho_coords
