@@ -3,6 +3,7 @@ import pickle
 import shutil
 import tempfile
 import time
+import xml.etree.ElementTree as ET
 
 import mmcv
 import torch
@@ -61,7 +62,7 @@ def single_gpu_test(model,
                     if ortho_name not in pd.keys():
                         pd[ortho_name] = curr_pd[ortho_name]
                     else:
-                        pd[ortho_name].append(curr_pd[ortho_name])
+                        pd[ortho_name].extend(curr_pd[ortho_name])
 
         # encode mask results
         if isinstance(result[0], tuple):
@@ -76,7 +77,11 @@ def single_gpu_test(model,
     gt = {ortho_name: [] for ortho_name in pd.keys()}
 
     for ortho_name in gt.keys():
-        tree = ET.parse(ortho_name + ".xml")
+        if "Test" not in ortho_name:
+            ortho_path = ortho_name.split("_")[0] + "/annotations/"
+        else:
+            ortho_path = "Rubble_Test/annotations/"
+        tree = ET.parse("../OrthoData/" + ortho_path + ortho_name + ".xml")
         root = tree.getroot()
 
         for boxes in root.iter('object'):

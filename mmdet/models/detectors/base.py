@@ -355,7 +355,7 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
                 ymin_p = bbox[1] + (img_row*size_minus_stride)
                 xmax_p = bbox[2] + (img_col*size_minus_stride)
                 ymax_p = bbox[3] + (img_row*size_minus_stride)
-                print("{}.tif {} {} {} {} {}".format(img_ortho, xmin_p, ymin_p, xmax_p, ymax_p, labels[idx]))
+                # print("{}.tif {} {} {} {} {}".format(img_ortho, xmin_p, ymin_p, xmax_p, ymax_p, labels[idx]))
 
                 # converting to orthophoto scale
                 ortho_x, ortho_y = cropped_px[0] + (img_col*size_minus_stride), \
@@ -417,24 +417,25 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
                     writer.writerow([img_name] + c[:])
 
         # draw bounding boxes
-        img = imshow_det_bboxes(
-            img,
-            bboxes,
-            labels,
-            segms,
-            class_names=self.CLASSES,
-            score_thr=score_thr,
-            bbox_color=bbox_color,
-            text_color=text_color,
-            mask_color=mask_color,
-            thickness=thickness,
-            font_size=font_size,
-            win_name=win_name,
-            show=show,
-            wait_time=wait_time,
-            out_file=out_file)
+        # img = imshow_det_bboxes(
+        #     img,
+        #     bboxes,
+        #     labels,
+        #     segms,
+        #     class_names=self.CLASSES,
+        #     score_thr=score_thr,
+        #     bbox_color=bbox_color,
+        #     text_color=text_color,
+        #     mask_color=mask_color,
+        #     thickness=thickness,
+        #     font_size=font_size,
+        #     win_name=win_name,
+        #     show=show,
+        #     wait_time=wait_time,
+        #     out_file=out_file)
 
         if not (show or out_file):
-            return img
+            pass
+            # return img
         else:
             return ortho_coords
