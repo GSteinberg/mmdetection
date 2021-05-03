@@ -94,8 +94,42 @@ def single_gpu_test(model,
             gt[ortho_name].append(entry)
 
     # prepare error dict - 2 classes
-    img_err_entry = [{"tp":0, "fp":0, "fn":0} for _ in range(2)]
+    classes = ["pfm-1", "ksf-casing"]
+    img_err_entry = [{"tp":0, "fp":0, "fn":0} for _ in range(len(classes))]
     raw_err = {ortho_name : img_err_entry for ortho_name in gt.keys()}
+
+    # ortho level evaluation
+    min_dist = 8.5
+    for ortho in pd.keys():
+        match = False       # prevent duplicate matches
+
+        # for each predicted point in respective ortho
+        for pd_entry in pd[ortho]:
+            # each gt point for same ortho
+            for gt_entry in gt[ortho]:
+                # if different object - go to next gt
+                gt_cat = gt_entry[0].lower()
+                pd_cat = classes[pd_entry[0]]
+                if gt_cat != pd_cat: continue
+
+                pd_coord = pd_entry[2:]
+                gt_coord = gt_entry[1:]
+                dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(pd_coord,gt_coord)]))
+                # TP: pred px matches ground truth px only once
+                if dist < min_dist and not match: 
+                    raw_err[pd_entry[0]]['tp'] += 1
+                    match = True
+                # FP: duplicate pred boxes
+                elif dist < min_dist and match:
+                    raw_err[pd_entry[0]]['fp'] += 1
+            
+            # FP: no truth box to match pred box
+            if not match: 
+                raw_err[pd_entry[0]]['fp'] += 1
+    
+    # FN: if # accurately predicted boxes < total # ground truths 
+    if raw_err[cat]['tp'] < len(cntr_gts[cat]):
+        raw_err[cat]['fn'] += len(cntr_gts[cat]) - raw_err[cat]['tp']
 
     return results
 
