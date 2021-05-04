@@ -102,10 +102,10 @@ def single_gpu_test(model,
     # ortho level evaluation
     min_dist = 20
     for ortho in pd.keys():
-        match = False       # prevent duplicate matches
-
         # for each predicted point in respective ortho
         for pd_entry in pd[ortho]:
+            match = False       # prevent duplicate matches
+
             # each gt point for same ortho
             for gt_entry in gt[ortho]:
                 # if different object - go to next gt
