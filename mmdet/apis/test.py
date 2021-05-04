@@ -97,6 +97,8 @@ def single_gpu_test(model,
     classes = ["pfm-1", "ksf-casing"]
     img_err_entry = [{"tp":0, "fp":0, "fn":0} for _ in range(len(classes))]
     raw_err = {ortho_name : img_err_entry for ortho_name in gt.keys()}
+    tot_gt_entry = [0 for _ in range(len(classes))]
+    tot_gt = {ortho_name : tot_gt_entry for ortho_name in gt.keys()}
 
     # ortho level evaluation
     min_dist = 8.5
@@ -108,28 +110,40 @@ def single_gpu_test(model,
             # each gt point for same ortho
             for gt_entry in gt[ortho]:
                 # if different object - go to next gt
-                gt_cat = gt_entry[0].lower()
-                pd_cat = classes[pd_entry[0]]
-                if gt_cat != pd_cat: continue
+                pd_cat = pd_entry[0]
+                gt_cat = classes.index(gt_entry[0].lower())
+                if pd_cat != gt_cat: continue
 
                 pd_coord = pd_entry[2:]
                 gt_coord = gt_entry[1:]
                 dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(pd_coord,gt_coord)]))
+
                 # TP: pred px matches ground truth px only once
                 if dist < min_dist and not match: 
-                    raw_err[pd_entry[0]]['tp'] += 1
+                    raw_err[ortho][pd_cat]['tp'] += 1
                     match = True
                 # FP: duplicate pred boxes
                 elif dist < min_dist and match:
-                    raw_err[pd_entry[0]]['fp'] += 1
+                    raw_err[ortho][pd_cat]['fp'] += 1
             
             # FP: no truth box to match pred box
             if not match: 
-                raw_err[pd_entry[0]]['fp'] += 1
+                raw_err[ortho][pd_cat]['fp'] += 1
     
-    # FN: if # accurately predicted boxes < total # ground truths 
-    if raw_err[cat]['tp'] < len(cntr_gts[cat]):
-        raw_err[cat]['fn'] += len(cntr_gts[cat]) - raw_err[cat]['tp']
+        # total ground truths for each cat
+        for gt_entry in gt[ortho]:
+            class_name = gt_entry[0].lower()
+            if class_name not in classes:
+                print("class is not in given classes")
+                exit()
+
+            class_i = classes.index(class_name)
+            tot_gt[ortho][class_i] += 1
+
+        # FN: if # accurately predicted boxes < total # ground truths
+        for cat_i in range(len(classes)):
+            if raw_err[ortho][cat_i]['tp'] < tot_gt[ortho][cat_i]:
+                raw_err[ortho][cat_i]['fn'] += tot_gt[ortho][cat_i] - raw_err[ortho][cat_i]['tp']
 
     return results
 
