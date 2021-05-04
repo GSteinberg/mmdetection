@@ -3,6 +3,7 @@ import pickle
 import shutil
 import tempfile
 import time
+import math
 import xml.etree.ElementTree as ET
 
 import mmcv
@@ -95,13 +96,11 @@ def single_gpu_test(model,
 
     # prepare error dict - 2 classes
     classes = ["pfm-1", "ksf-casing"]
-    img_err_entry = [{"tp":0, "fp":0, "fn":0} for _ in range(len(classes))]
-    raw_err = {ortho_name : img_err_entry for ortho_name in gt.keys()}
-    tot_gt_entry = [0 for _ in range(len(classes))]
-    tot_gt = {ortho_name : tot_gt_entry for ortho_name in gt.keys()}
+    raw_err = {ortho_name : [{"tp":0, "fp":0, "fn":0} for _ in range(len(classes))] for ortho_name in gt.keys()}
+    tot_gt = {ortho_name : [0 for _ in range(len(classes))] for ortho_name in gt.keys()}
 
     # ortho level evaluation
-    min_dist = 8.5
+    min_dist = 20
     for ortho in pd.keys():
         match = False       # prevent duplicate matches
 
@@ -124,7 +123,8 @@ def single_gpu_test(model,
                     match = True
                 # FP: duplicate pred boxes
                 elif dist < min_dist and match:
-                    raw_err[ortho][pd_cat]['fp'] += 1
+                    pass
+                    # raw_err[ortho][pd_cat]['fp'] += 1
             
             # FP: no truth box to match pred box
             if not match: 
