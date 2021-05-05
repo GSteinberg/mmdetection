@@ -121,10 +121,6 @@ def single_gpu_test(model,
                 if dist < min_dist and not match: 
                     raw_err[ortho][pd_cat]['tp'] += 1
                     match = True
-                # FP: duplicate pred boxes
-                elif dist < min_dist and match:
-                    pass
-                    # raw_err[ortho][pd_cat]['fp'] += 1
             
             # FP: no truth box to match pred box
             if not match: 
