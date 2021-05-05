@@ -91,20 +91,21 @@ def single_gpu_test(model,
                 xmin, ymin = int(box.find("xmin").text), int(box.find("ymin").text)
                 xmax, ymax = int(box.find("xmax").text), int(box.find("ymax").text)
             
-            entry = [name, int((xmin+xmax) / 2), int((ymin+ymax) / 2)]
+            entry = [name, int((xmin+xmax) / 2), int((ymin+ymax) / 2), False]
             gt[ortho_name].append(entry)
 
     # prepare error dict - 2 classes
     classes = ["pfm-1", "ksf-casing"]
     raw_err = {ortho_name : [{"tp":0, "fp":0, "fn":0} for _ in range(len(classes))] for ortho_name in gt.keys()}
     tot_gt = {ortho_name : [0 for _ in range(len(classes))] for ortho_name in gt.keys()}
+    tot_err = [{"tp":0, "fp":0, "fn":0} for _ in range(len(classes))]
 
     # ortho level evaluation
     min_dist = 20
     for ortho in pd.keys():
-        # for each predicted point in respective ortho
+        # for each pd point in respective ortho
         for pd_entry in pd[ortho]:
-            match = False       # prevent duplicate matches
+            match_for_pd = False
 
             # each gt point for same ortho
             for gt_entry in gt[ortho]:
@@ -117,22 +118,20 @@ def single_gpu_test(model,
                 gt_coord = gt_entry[1:]
                 dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(pd_coord,gt_coord)]))
 
-                # TP: pred px matches ground truth px only once
-                if dist < min_dist and not match: 
+                # TP: pd matches gt only once
+                if dist < min_dist and not gt_entry[-1]:
                     raw_err[ortho][pd_cat]['tp'] += 1
-                    match = True
+                    gt_entry[-1] = True
+                    match_for_pd = True
+                    break
             
-            # FP: no truth box to match pred box
-            if not match: 
+            # FP: no gt to match pd
+            if not match_for_pd:
                 raw_err[ortho][pd_cat]['fp'] += 1
     
         # total ground truths for each cat
         for gt_entry in gt[ortho]:
             class_name = gt_entry[0].lower()
-            if class_name not in classes:
-                print("class is not in given classes")
-                exit()
-
             class_i = classes.index(class_name)
             tot_gt[ortho][class_i] += 1
 
@@ -140,6 +139,12 @@ def single_gpu_test(model,
         for cat_i in range(len(classes)):
             if raw_err[ortho][cat_i]['tp'] < tot_gt[ortho][cat_i]:
                 raw_err[ortho][cat_i]['fn'] += tot_gt[ortho][cat_i] - raw_err[ortho][cat_i]['tp']
+
+        # fill tot_err
+        for cat_i in range(len(classes)):
+            cat_entry = raw_err[ortho][cat_i]
+            for met in cat_entry.keys():
+                tot_err[cat_i][met] += cat_entry[met]
 
     return results
 
