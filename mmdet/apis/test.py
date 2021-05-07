@@ -118,11 +118,13 @@ def single_gpu_test(model,
                 gt_coord = gt_entry[1:]
                 dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(pd_coord,gt_coord)]))
 
-                # TP: pd matches gt only once
-                if dist < min_dist and not gt_entry[-1]:
-                    raw_err[ortho][pd_cat]['tp'] += 1
-                    gt_entry[-1] = True
-                    match_for_pd = True
+                # TP: if dist is appropriate
+                if dist < min_dist:
+                    # if dt has not been matched yet
+                    if not gt_entry[-1]:
+                        raw_err[ortho][pd_cat]['tp'] += 1
+                        gt_entry[-1] = True     # set gt to 'has been matched'
+                    match_for_pd = True     # set pd to 'has been matched'
                     break
             
             # FP: no gt to match pd
