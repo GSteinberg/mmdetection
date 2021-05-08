@@ -6,6 +6,7 @@ import mmcv
 import numpy as np
 import os
 import json
+import math
 import utm
 import torch
 import torch.distributed as dist
@@ -360,6 +361,19 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
                 # converting to orthophoto scale
                 ortho_x, ortho_y = cropped_px[0] + (img_col*size_minus_stride), \
                                    cropped_px[1] + (img_row*size_minus_stride)
+
+                # throw out any duplicate boxes
+                dup = False
+                min_dist = 20
+                curr_pt = [ortho_x, ortho_y]
+
+                if img_ortho in ortho_coords.keys():
+                    for pt in ortho_coords[img_ortho]:
+                        dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(pt[2:],curr_pt)]))
+                        if dist < min_dist:
+                            dup = True
+                            break
+                if dup: continue
 
                 # fetch respective ortho metdata
                 # structure: metadata[0]    == x-pixel res
