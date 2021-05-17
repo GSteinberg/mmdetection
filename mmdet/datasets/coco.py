@@ -524,16 +524,17 @@ class CocoDataset(CustomDataset):
                     gt_catId = gt['category_id']
                     gt_imgId = gt['image_id']
                     gt_box = gt['segmentation'][0][:2] + gt['segmentation'][0][4:6]
+                    # [img_id, x_coord, y_coord]
                     cntr_gts[gt_catId].append(
                             (gt_imgId, np.mean([gt_box[0], gt_box[2]]), np.mean([gt_box[1], gt_box[3]])))
 
                 # True:  calc score for multiple thresholds to convert to a graph
                 # False: calc score for one threshold
-                AUC_chart = True
+                AUC_chart = False
                 for score_thr in np.arange(0, 1, 0.05):
                     # if no chart is wanted, set one threshold
                     if not AUC_chart:
-                        score_thr = 0.4
+                        score_thr = 0.6
 
                     score_thr = np.round(score_thr, 2)
                     # get center pxl for each detected box
@@ -543,9 +544,10 @@ class CocoDataset(CustomDataset):
                         dt_imgId = dt['image_id']
                         dt_box = dt['segmentation'][0][:2] + dt['segmentation'][0][4:6]
                         # if score for that box > prediction threshold, add to cntr_dts
+                        # [img_id, score, x_coord, y_coord]
                         if dt['score'] > score_thr:
-                            cntr_dts[dt_catId].append(
-                                    (dt_imgId, np.mean([dt_box[0], dt_box[2]]), np.mean([dt_box[1], dt_box[3]])))
+                            cntr_dts[dt_catId].append((dt_imgId, dt['score']
+                                    np.mean([dt_box[0], dt_box[2]]), np.mean([dt_box[1], dt_box[3]])))
 
                     # compute metrics
                     raw_err = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
@@ -560,8 +562,8 @@ class CocoDataset(CustomDataset):
                                 if gt[0] != dt[0]: continue
 
                                 # in same image
-                                dt_cnt = dt[1:]
-                                gt_cnt = gt[1:]
+                                dt_cnt = dt[-2:]
+                                gt_cnt = gt[-2:]
                                 dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(dt_cnt,gt_cnt)]))
                                 # TP: pred px matches ground truth px only once
                                 if dist < min_dist and not match: 
@@ -626,15 +628,79 @@ class CocoDataset(CustomDataset):
                 import pdb;pdb.set_trace()
 
                 # True: output real world coords of detections
-                ouput_coords = True
+                output_coords = True
                 if output_coords:
-                    for gt_entry in cntr_gts:
+                    coords = {}
+                    ortho_coords = {}
+
+                    # for cropped img size and stride
+                    with open('../SplitData/COCO/meta_dict.json') as json_file:
+                        meta_sizes = json.load(json_file)
+
+                    for bbox in cntr_gts:
                         # row and col of image in respective orthophoto (img_ortho)
-                        img_name = entry['file_name'] for entry in imgNames if entry['id'] == gt_entry[0]
+                        img_name = [entry['file_name'] for entry in imgNames if entry['id'] == gt_entry[0]]
+                        img_name = img_name[0]
                         split_img_name = img_name.split("_Split")
                         img_row, img_col = int(split_img_name[1][:3]), int(split_img_name[1][3:6])
                         img_ortho = split_img_name[0]
                         full_img_ortho_name = img_ortho + ".tif"
+
+                        # getting cropped img size and stride
+                        size_minus_stride = meta_sizes[full_img_ortho_name][0] - meta_sizes[full_img_ortho_name][1]
+
+                        # fetch respective ortho metdata
+                        # structure: metadata[0]    == x-pixel res
+                        #            metadata[1:3]  == rotational components
+                        #            metadata[3]    == y-pixel res
+                        #            metadata[4]    == Easting of upper left pixel
+                        #            metadata[5]    == Northing of upper left pixel
+                        ortho_dir = os.path.join("../OrthoData/metadata", img_ortho + ".tfw")
+                        f = open(ortho_dir, "r")
+                        metadata = f.read().split("\n")[:-1]
+                        f.close()
+
+                        x_res, y_res, easting, northing = \
+                                float(metadata[0]), float(metadata[3]), float(metadata[4]), float(metadata[5])
+
+                        if img_ortho not in coords.keys():
+                            coords[img_ortho] = []
+                        coords[img_ortho].append([labels[idx], score,
+                                easting + (ortho_x*x_res), northing + (ortho_y*y_res)])
+
+                        # output for orthophoto level eval
+                        if img_ortho not in ortho_coords.keys():
+                            ortho_coords[img_ortho] = []
+                        ortho_coords[img_ortho].append([labels[idx], score, ortho_x, ortho_y])
+
+                    # OUTPUT REAL COORDS
+                    # ortho this photo belongs to
+                    img_name = [*coords][0]
+
+                    # convert utm to lat long
+                    for pnt in range(len(coords[img_name])):
+                        lat_long = utm.to_latlon(coords[img_name][pnt][2], coords[img_name][pnt][3], 18, 'T')
+                        coords[img_name][pnt].extend(lat_long)
+
+                    # coords for each ortho
+                    indv_ortho_file = 'faster_rcnn_r101_fpn_1x_coco_results/' + img_name + '_coords.csv'
+                    with open(indv_ortho_file, 'a+', newline='') as csvfile:
+                        writer = csv.writer(csvfile)
+                        # if file is empty, write heading then append, else just append
+                        if os.stat(indv_ortho_file).st_size == 0:
+                            writer.writerow(["Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
+                        for c in coords[img_name]:
+                            writer.writerow(c[:])
+
+                    # all coords from all orthos
+                    all_coords_file = 'faster_rcnn_r101_fpn_1x_coco_results/all_coords.csv'
+                    with open(all_coords_file, 'a+', newline='') as csvfile:
+                        writer = csv.writer(csvfile)
+                        # if file is empty, write heading then append, else just append
+                        if os.stat(all_coords_file).st_size == 0:
+                            writer.writerow(["Photo", "Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
+                        for c in coords[img_name]:
+                            writer.writerow([img_name] + c[:])
 
                 ### =========================================================== ###
 
