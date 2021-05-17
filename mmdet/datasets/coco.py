@@ -510,6 +510,13 @@ class CocoDataset(CustomDataset):
                 gts=cocoGt.loadAnns(cocoGt.getAnnIds(imgIds=imgIds, catIds=catIds))
                 dts=cocoDt.loadAnns(cocoDt.getAnnIds(imgIds=imgIds, catIds=catIds))
 
+                # get image names
+                with open('landmine/test/coco_annotation.json') as outfile:
+                    imgNames = json.load(outfile)
+                    del imgNames['annotations']
+                    del imgNames['categories']
+
+                import pdb;pdb.set_trace()
                 # get center pxl for each ground truth box
                 cntr_gts = [[] for _ in range(num_classes)]
                 for gt in gts:
