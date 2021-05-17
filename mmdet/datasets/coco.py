@@ -655,6 +655,19 @@ class CocoDataset(CustomDataset):
                             # converting to orthophoto scale
                             ortho_x, ortho_y = bbox[-2] + (img_col*size_minus_stride), bbox[-1] + (img_row*size_minus_stride)
 
+                            # throw out any duplicate boxes
+                            dup = False
+                            min_dist = 20
+                            curr_pt = [ortho_x, ortho_y]
+
+                            if img_ortho in ortho_coords.keys():
+                                for pt in ortho_coords[img_ortho]:
+                                    dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(pt[2:],curr_pt)]))
+                                    if dist < min_dist:
+                                        dup = True
+                                        break
+                            if dup: continue
+
                             # fetch respective ortho metdata
                             # structure: metadata[0]    == x-pixel res
                             #            metadata[1:3]  == rotational components
