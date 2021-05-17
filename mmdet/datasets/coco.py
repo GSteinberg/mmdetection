@@ -363,6 +363,180 @@ class CocoDataset(CustomDataset):
         result_files = self.results2json(results, jsonfile_prefix)
         return result_files, tmp_dir
 
+    def calc_tp_fp_fn(self, cat_ids, cntr_dts, min_dist=8.5):
+        raw_err = [{"tp":0, "fp":0, "fn":0} for _ in range(len(cat_ids))]
+        min_dist = 8.5      # min dist between points
+        for cat in catIds:
+            for dt in cntr_dts[cat]:
+                match = False       # prevent duplicate matches
+
+                # for ground truth box of category cat for same image
+                for gt in cntr_gts[cat]:
+                    # if gt and dt are not in the same image, skip this gt
+                    if gt[0] != dt[0]: continue
+
+                    # in same image
+                    dt_cnt = dt[-2:]
+                    gt_cnt = gt[-2:]
+                    dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(dt_cnt,gt_cnt)]))
+                    # TP: pred px matches ground truth px only once
+                    if dist < min_dist and not match:
+                        raw_err[cat]['tp'] += 1
+                        match = True
+                    # FP: duplicate pred boxes
+                    elif dist < min_dist and match:
+                        raw_err[cat]['fp'] += 1
+
+                # FP: no truth box to match pred box
+                if not match:
+                    raw_err[cat]['fp'] += 1
+
+            # FN: if # accurately predicted boxes < total # ground truths
+            if raw_err[cat]['tp'] < len(cntr_gts[cat]):
+                raw_err[cat]['fn'] += len(cntr_gts[cat]) - raw_err[cat]['tp']
+
+        # add totals
+        raw_total = {'tp':0, 'fp':0, 'fn':0}
+        for key in raw_total.keys():
+            raw_total[key] = sum(raw_err[c][key] for c in range(num_classes))
+        raw_err.append(raw_total)
+
+        return raw_err
+
+    def calc_prec_reca_f1(self, cat_ids, raw_err):
+        num_classes = len(cat_ids)
+        rel_err = [{"prec":0, "recall":0, "f1":0} for _ in range(num_classes)]
+        for c in range(num_classes):
+            if raw_err[c]['tp'] == 0:
+                rel_err[c]['prec'] = 0
+                rel_err[c]['recall'] = 0
+                rel_err[c]['f1'] = 0
+                continue
+
+            # precision - tp/(tp+fp)
+            rel_err[c]['prec'] = raw_err[c]['tp'] / (raw_err[c]['tp']+raw_err[c]['fp'])
+            # recall - tp/(tp+fn)
+            rel_err[c]['recall'] = raw_err[c]['tp'] / (raw_err[c]['tp']+raw_err[c]['fn'])
+            # f1 - 2*[(prec*rec)/(prec+rec)]
+            rel_err[c]['f1'] = 2 * \
+                    ((rel_err[c]['prec'] * rel_err[c]['recall']) / (rel_err[c]['prec'] + rel_err[c]['recall']))
+
+        # average prec, recall, f1
+        rel_total = {"prec":0, "recall":0, "f1":0}
+        for key in rel_total.keys():
+            rel_total[key] = np.mean([rel_err[c][key] for c in range(num_classes)])
+
+        # add totals
+        rel_err.append(rel_total)
+
+        return rel_err
+
+    def print_err_rep(self, raw_err, rel_err, name):
+        with open("faster_rcnn_r101_fpn_1x_coco_results/" + name, "w", newline='') as f:
+            writer = csv.writer(f)
+
+            writer.writerow(["--"] + catIds + ["total"])
+            for key in raw_err[0].keys():
+                writer.writerow([key] + [raw_err[i][key] for i in range(len(raw_err))])
+            writer.writerow(['----'])
+            for key in rel_err[0].keys():
+                writer.writerow([key] + ["{:.4f}".format(rel_err[i][key]) for i in range(len(rel_err))])
+
+    def gen_url_and_ortho_coords(self, cat_names, cntr_dts):
+        coords = {}
+        ortho_coords = {}
+
+        # for cropped img size and stride
+        with open('../SplitData/COCO/meta_dict.json') as json_file:
+            meta_sizes = json.load(json_file)
+
+        # get image names to coordinate to imgIds
+        with open('landmine/test/coco_annotation.json') as outfile:
+            imgNames = json.load(outfile)
+            del imgNames['annotations']
+
+        for cat_id in range(len(cntr_dts)):
+            for bbox in cntr_dts[cat_id]:
+                # row and col of image in respective orthophoto (img_ortho)
+                img_name = [entry['file_name'] for entry in imgNames['images'] if entry['id'] == bbox[0]]
+                img_name = img_name[0]
+                split_img_name = img_name.split("_Split")
+                img_row, img_col = int(split_img_name[1][:3]), int(split_img_name[1][3:6])
+                img_ortho = split_img_name[0]
+                full_img_ortho_name = img_ortho + ".tif"
+
+                # getting cropped img size and stride
+                size_minus_stride = meta_sizes[full_img_ortho_name][0] - meta_sizes[full_img_ortho_name][1]
+
+                # converting to orthophoto scale
+                ortho_x, ortho_y = bbox[-2] + (img_col*size_minus_stride), bbox[-1] + (img_row*size_minus_stride)
+
+                # throw out any duplicate boxes
+                dup = False
+                min_dist = 20
+                curr_pt = [ortho_x, ortho_y]
+
+                if img_ortho in ortho_coords.keys():
+                    for pt in ortho_coords[img_ortho]:
+                        dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(pt[2:],curr_pt)]))
+                        if dist < min_dist:
+                            dup = True
+                            break
+                if dup: continue
+
+                # fetch respective ortho metdata
+                # structure: metadata[0]    == x-pixel res
+                #            metadata[1:3]  == rotational components
+                #            metadata[3]    == y-pixel res
+                #            metadata[4]    == Easting of upper left pixel
+                #            metadata[5]    == Northing of upper left pixel
+                ortho_dir = os.path.join("../OrthoData/metadata", img_ortho + ".tfw")
+                f = open(ortho_dir, "r")
+                metadata = f.read().split("\n")[:-1]
+                f.close()
+
+                x_res, y_res, easting, northing = \
+                        float(metadata[0]), float(metadata[3]), float(metadata[4]), float(metadata[5])
+
+                score = bbox[1]
+
+                if img_ortho not in coords.keys():
+                    coords[img_ortho] = []
+                coords[img_ortho].append([cat_names[cat_id], score,
+                        easting + (ortho_x*x_res), northing + (ortho_y*y_res)])
+
+                # output for orthophoto level eval
+                if img_ortho not in ortho_coords.keys():
+                    ortho_coords[img_ortho] = []
+                ortho_coords[img_ortho].append([cat_names[cat_id], score, ortho_x, ortho_y])
+
+        return coords, ortho_coords
+
+    def print_irl_coords():
+        # convert utm to lat long
+        for img_name in coords.keys():
+            for pnt in range(len(coords[img_name])):
+                lat_long = utm.to_latlon(coords[img_name][pnt][2], coords[img_name][pnt][3], 18, 'T')
+                coords[img_name][pnt].extend(lat_long)
+
+        # coords for each ortho
+        for img_name in coords.keys():
+            indv_ortho_file = 'faster_rcnn_r101_fpn_1x_coco_results/' + img_name + '_coords.csv'
+            with open(indv_ortho_file, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(["Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
+                for c in coords[img_name]:
+                    writer.writerow(c[:])
+
+        # all coords from all orthos
+        all_coords_file = 'faster_rcnn_r101_fpn_1x_coco_results/all_coords.csv'
+        with open(all_coords_file, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["Photo", "Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
+            for img_name in coords:
+                for c in coords[img_name]:
+                    writer.writerow([img_name] + c[:])
+
     def evaluate(self,
                  results,
                  metric='bbox',
@@ -514,11 +688,6 @@ class CocoDataset(CustomDataset):
                 gts=cocoGt.loadAnns(cocoGt.getAnnIds(imgIds=imgIds, catIds=catIds))
                 dts=cocoDt.loadAnns(cocoDt.getAnnIds(imgIds=imgIds, catIds=catIds))
 
-                # get image names
-                with open('landmine/test/coco_annotation.json') as outfile:
-                    imgNames = json.load(outfile)
-                    del imgNames['annotations']
-
                 # names of cats
                 cat_names = ['pfm-1', 'ksf-casing']
 
@@ -540,7 +709,8 @@ class CocoDataset(CustomDataset):
                     if not AUC_chart:
                         score_thr = 0.6
 
-                    score_thr = np.round(score_thr, 2)
+                    score_thr = np.round(score_thr, 2)      # round for arange bug
+
                     # get center pxl for each detected box
                     cntr_dts = [[] for _ in range(num_classes)]
                     for dt in dts:
@@ -553,171 +723,28 @@ class CocoDataset(CustomDataset):
                             cntr_dts[dt_catId].append((dt_imgId, dt['score'],
                                     np.mean([dt_box[0], dt_box[2]]), np.mean([dt_box[1], dt_box[3]])))
 
-                    # compute metrics
-                    raw_err = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
-                    min_dist = 8.5      # min dist between points
-                    for cat in catIds:
-                        for dt in cntr_dts[cat]:
-                            match = False       # prevent duplicate matches
-
-                            # for ground truth box of category cat for same image
-                            for gt in cntr_gts[cat]:
-                                # if gt and dt are not in the same image, skip this gt
-                                if gt[0] != dt[0]: continue
-
-                                # in same image
-                                dt_cnt = dt[-2:]
-                                gt_cnt = gt[-2:]
-                                dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(dt_cnt,gt_cnt)]))
-                                # TP: pred px matches ground truth px only once
-                                if dist < min_dist and not match: 
-                                    raw_err[cat]['tp'] += 1
-                                    match = True
-                                # FP: duplicate pred boxes
-                                elif dist < min_dist and match:
-                                    raw_err[cat]['fp'] += 1
-                            
-                            # FP: no truth box to match pred box
-                            if not match: 
-                                raw_err[cat]['fp'] += 1
-                        
-                        # FN: if # accurately predicted boxes < total # ground truths 
-                        if raw_err[cat]['tp'] < len(cntr_gts[cat]):
-                            raw_err[cat]['fn'] += len(cntr_gts[cat]) - raw_err[cat]['tp']
+                    # calculate raw error
+                    raw_err = calc_tp_fp_fn(catIds, cntr_dts)
                     
                     # calculate precision, recall, F1 for each class and all classes
-                    rel_err = [{"prec":0, "recall":0, "f1":0} for _ in range(num_classes)]
-                    for c in range(num_classes):
-                        if raw_err[c]['tp'] == 0:
-                            rel_err[c]['prec'] = 0
-                            rel_err[c]['recall'] = 0
-                            rel_err[c]['f1'] = 0
-                            continue
-                        
-                        # precision - tp/(tp+fp)
-                        rel_err[c]['prec'] = raw_err[c]['tp'] / (raw_err[c]['tp']+raw_err[c]['fp'])
-                        # recall - tp/(tp+fn)
-                        rel_err[c]['recall'] = raw_err[c]['tp'] / (raw_err[c]['tp']+raw_err[c]['fn'])
-                        # f1 - 2*[(prec*rec)/(prec+rec)]
-                        rel_err[c]['f1'] = 2 * \
-                                ((rel_err[c]['prec'] * rel_err[c]['recall']) / \
-                                 (rel_err[c]['prec'] + rel_err[c]['recall']))
-
-                    # average prec, recall, f1
-                    rel_total = {"prec":0, "recall":0, "f1":0}
-                    for key in rel_total.keys():
-                        rel_total[key] = np.mean([rel_err[c][key] for c in range(num_classes)])
-
-                    # add totals
-                    rel_err.append(rel_total)
-                    raw_total = {'tp':0, 'fp':0, 'fn':0}
-                    for key in raw_total.keys():
-                        raw_total[key] = sum(raw_err[c][key] for c in range(num_classes))
-                    raw_err.append(raw_total)
+                    rel_err = calc_prec_reca_f1(catIds, raw_err)
 
                     # print error reports
-                    err_report_name = "error_report_{}.csv".format(str(score_thr)[2:])
-                    with open("faster_rcnn_r101_fpn_1x_coco_results/" + err_report_name,"w", newline='') as f:
-                        writer = csv.writer(f)
-
-                        writer.writerow(["--"] + catIds + ["total"])
-                        for key in raw_err[0].keys():
-                            writer.writerow([key] + [raw_err[i][key] for i in range(len(raw_err))])
-                        writer.writerow(['----'])
-                        for key in rel_err[0].keys():
-                            writer.writerow([key] + ["{:.4f}".format(rel_err[i][key]) for i in range(len(rel_err))])
+                    err_rep_name = "error_report_{}.csv".format(str(score_thr)[2:])
+                    print_err_rep(raw_err, rel_err, err_rep_name)
 
                     if not AUC_chart: break
 
                 # True: output real world coords of detections
                 output_coords = True
                 if output_coords:
-                    coords = {}
-                    ortho_coords = {}
+                    # generate real world coords and orthophoto coords
+                    coords, ortho_coords = gen_irl_and_ortho_coords(cat_names, cntr_dts)
 
-                    # for cropped img size and stride
-                    with open('../SplitData/COCO/meta_dict.json') as json_file:
-                        meta_sizes = json.load(json_file)
-
-                    for cat_id in range(len(cntr_dts)):
-                        for bbox in cntr_dts[cat_id]:
-                            # row and col of image in respective orthophoto (img_ortho)
-                            img_name = [entry['file_name'] for entry in imgNames['images'] if entry['id'] == bbox[0]]
-                            img_name = img_name[0]
-                            split_img_name = img_name.split("_Split")
-                            img_row, img_col = int(split_img_name[1][:3]), int(split_img_name[1][3:6])
-                            img_ortho = split_img_name[0]
-                            full_img_ortho_name = img_ortho + ".tif"
-                            
-                            # getting cropped img size and stride
-                            size_minus_stride = meta_sizes[full_img_ortho_name][0] - meta_sizes[full_img_ortho_name][1]
-
-                            # converting to orthophoto scale
-                            ortho_x, ortho_y = bbox[-2] + (img_col*size_minus_stride), bbox[-1] + (img_row*size_minus_stride)
-
-                            # throw out any duplicate boxes
-                            dup = False
-                            min_dist = 20
-                            curr_pt = [ortho_x, ortho_y]
-
-                            if img_ortho in ortho_coords.keys():
-                                for pt in ortho_coords[img_ortho]:
-                                    dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(pt[2:],curr_pt)]))
-                                    if dist < min_dist:
-                                        dup = True
-                                        break
-                            if dup: continue
-
-                            # fetch respective ortho metdata
-                            # structure: metadata[0]    == x-pixel res
-                            #            metadata[1:3]  == rotational components
-                            #            metadata[3]    == y-pixel res
-                            #            metadata[4]    == Easting of upper left pixel
-                            #            metadata[5]    == Northing of upper left pixel
-                            ortho_dir = os.path.join("../OrthoData/metadata", img_ortho + ".tfw")
-                            f = open(ortho_dir, "r")
-                            metadata = f.read().split("\n")[:-1]
-                            f.close()
-
-                            x_res, y_res, easting, northing = \
-                                    float(metadata[0]), float(metadata[3]), float(metadata[4]), float(metadata[5])
-                            
-                            score = bbox[1]
-
-                            if img_ortho not in coords.keys():
-                                coords[img_ortho] = []
-                            coords[img_ortho].append([cat_names[cat_id], score,
-                                    easting + (ortho_x*x_res), northing + (ortho_y*y_res)])
-
-                            # output for orthophoto level eval
-                            if img_ortho not in ortho_coords.keys():
-                                ortho_coords[img_ortho] = []
-                            ortho_coords[img_ortho].append([cat_names[cat_id], score, ortho_x, ortho_y])
+                    # ORTHO-LEVEL EVALUATION
 
                     # OUTPUT REAL COORDS
-                    # convert utm to lat long
-                    for img_name in coords.keys():
-                        for pnt in range(len(coords[img_name])):
-                            lat_long = utm.to_latlon(coords[img_name][pnt][2], coords[img_name][pnt][3], 18, 'T')
-                            coords[img_name][pnt].extend(lat_long)
-
-                    # coords for each ortho
-                    for img_name in coords.keys():
-                        indv_ortho_file = 'faster_rcnn_r101_fpn_1x_coco_results/' + img_name + '_coords.csv'
-                        with open(indv_ortho_file, 'w', newline='') as csvfile:
-                            writer = csv.writer(csvfile)
-                            writer.writerow(["Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
-                            for c in coords[img_name]:
-                                writer.writerow(c[:])
-
-                    # all coords from all orthos
-                    all_coords_file = 'faster_rcnn_r101_fpn_1x_coco_results/all_coords.csv'
-                    with open(all_coords_file, 'w', newline='') as csvfile:
-                        writer = csv.writer(csvfile)
-                        writer.writerow(["Photo", "Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
-                        for img_name in coords:
-                            for c in coords[img_name]:
-                                writer.writerow([img_name] + c[:])
+                    print_irl_coords(coords)
 
                 ### =========================================================== ###
 
