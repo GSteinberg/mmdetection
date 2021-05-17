@@ -504,6 +504,8 @@ class CocoDataset(CustomDataset):
                         f'{cocoEval.stats[coco_metric_names[item]]:.3f}')
                     eval_results[item] = val
             else:
+                ### =========================================================== ###
+
                 imgIds = sorted(cocoGt.getImgIds())
                 catIds = sorted(cocoGt.getCatIds())
                 num_classes = len(catIds)
@@ -516,7 +518,6 @@ class CocoDataset(CustomDataset):
                     del imgNames['annotations']
                     del imgNames['categories']
 
-                import pdb;pdb.set_trace()
                 # get center pxl for each ground truth box
                 cntr_gts = [[] for _ in range(num_classes)]
                 for gt in gts:
@@ -526,27 +527,29 @@ class CocoDataset(CustomDataset):
                     cntr_gts[gt_catId].append(
                             (gt_imgId, np.mean([gt_box[0], gt_box[2]]), np.mean([gt_box[1], gt_box[3]])))
 
-                # get center pxl for each detected box
+                # True:  calc score for multiple thresholds to convert to a graph
+                # False: calc score for one threshold
                 AUC_chart = True
-                
                 for score_thr in np.arange(0, 1, 0.05):
+                    # if no chart is wanted, set one threshold
                     if not AUC_chart:
                         score_thr = 0.4
 
                     score_thr = np.round(score_thr, 2)
+                    # get center pxl for each detected box
                     cntr_dts = [[] for _ in range(num_classes)]
                     for dt in dts:
                         dt_catId = dt['category_id']
                         dt_imgId = dt['image_id']
                         dt_box = dt['segmentation'][0][:2] + dt['segmentation'][0][4:6]
-                        # if score for that box > prediction threshold
+                        # if score for that box > prediction threshold, add to cntr_dts
                         if dt['score'] > score_thr:
                             cntr_dts[dt_catId].append(
                                     (dt_imgId, np.mean([dt_box[0], dt_box[2]]), np.mean([dt_box[1], dt_box[3]])))
 
                     # compute metrics
                     raw_err = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
-                    min_dist = 8.5      # dist between points
+                    min_dist = 8.5      # min dist between points
                     for cat in catIds:
                         for dt in cntr_dts[cat]:
                             match = False       # prevent duplicate matches
@@ -606,6 +609,7 @@ class CocoDataset(CustomDataset):
                         raw_total[key] = sum(raw_err[c][key] for c in range(num_classes))
                     raw_err.append(raw_total)
 
+                    # print error reports
                     err_report_name = "error_report_{}.csv".format(str(score_thr)[2:])
                     with open("faster_rcnn_r101_fpn_1x_coco_results/" + err_report_name,"w", newline='') as f:
                         writer = csv.writer(f)
@@ -618,6 +622,21 @@ class CocoDataset(CustomDataset):
                             writer.writerow([key] + ["{:.4f}".format(rel_err[i][key]) for i in range(len(rel_err))])
 
                     if not AUC_chart: break
+
+                import pdb;pdb.set_trace()
+
+                # True: output real world coords of detections
+                ouput_coords = True
+                if output_coords:
+                    for gt_entry in cntr_gts:
+                        # row and col of image in respective orthophoto (img_ortho)
+                        img_name = entry['file_name'] for entry in imgNames if entry['id'] == gt_entry[0]
+                        split_img_name = img_name.split("_Split")
+                        img_row, img_col = int(split_img_name[1][:3]), int(split_img_name[1][3:6])
+                        img_ortho = split_img_name[0]
+                        full_img_ortho_name = img_ortho + ".tif"
+
+                ### =========================================================== ###
 
                 # compute coco metrics
                 cocoEval.evaluate()
