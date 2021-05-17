@@ -363,10 +363,11 @@ class CocoDataset(CustomDataset):
         result_files = self.results2json(results, jsonfile_prefix)
         return result_files, tmp_dir
 
-    def calc_tp_fp_fn(self, cat_ids, cntr_dts, min_dist=8.5):
-        raw_err = [{"tp":0, "fp":0, "fn":0} for _ in range(len(cat_ids))]
+    def calc_tp_fp_fn(self, cat_ids, cntr_gts, cntr_dts, min_dist=8.5):
+        num_classes = len(cat_ids)
+        raw_err = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
         min_dist = 8.5      # min dist between points
-        for cat in catIds:
+        for cat in cat_ids:
             for dt in cntr_dts[cat]:
                 match = False       # prevent duplicate matches
 
@@ -431,18 +432,18 @@ class CocoDataset(CustomDataset):
 
         return rel_err
 
-    def print_err_rep(self, raw_err, rel_err, name):
+    def print_err_rep(self, cat_ids, raw_err, rel_err, name):
         with open("faster_rcnn_r101_fpn_1x_coco_results/" + name, "w", newline='') as f:
             writer = csv.writer(f)
 
-            writer.writerow(["--"] + catIds + ["total"])
+            writer.writerow(["--"] + cat_ids + ["total"])
             for key in raw_err[0].keys():
                 writer.writerow([key] + [raw_err[i][key] for i in range(len(raw_err))])
             writer.writerow(['----'])
             for key in rel_err[0].keys():
                 writer.writerow([key] + ["{:.4f}".format(rel_err[i][key]) for i in range(len(rel_err))])
 
-    def gen_url_and_ortho_coords(self, cat_names, cntr_dts):
+    def gen_irl_and_ortho_coords(self, cat_names, cntr_dts):
         coords = {}
         ortho_coords = {}
 
@@ -512,7 +513,7 @@ class CocoDataset(CustomDataset):
 
         return coords, ortho_coords
 
-    def print_irl_coords():
+    def print_irl_coords(self, coords):
         # convert utm to lat long
         for img_name in coords.keys():
             for pnt in range(len(coords[img_name])):
@@ -724,14 +725,14 @@ class CocoDataset(CustomDataset):
                                     np.mean([dt_box[0], dt_box[2]]), np.mean([dt_box[1], dt_box[3]])))
 
                     # calculate raw error
-                    raw_err = calc_tp_fp_fn(catIds, cntr_dts)
+                    raw_err = self.calc_tp_fp_fn(catIds, cntr_gts, cntr_dts)
                     
                     # calculate precision, recall, F1 for each class and all classes
-                    rel_err = calc_prec_reca_f1(catIds, raw_err)
+                    rel_err = self.calc_prec_reca_f1(catIds, raw_err)
 
                     # print error reports
                     err_rep_name = "error_report_{}.csv".format(str(score_thr)[2:])
-                    print_err_rep(raw_err, rel_err, err_rep_name)
+                    self.print_err_rep(catIds, raw_err, rel_err, err_rep_name)
 
                     if not AUC_chart: break
 
@@ -739,12 +740,12 @@ class CocoDataset(CustomDataset):
                 output_coords = True
                 if output_coords:
                     # generate real world coords and orthophoto coords
-                    coords, ortho_coords = gen_irl_and_ortho_coords(cat_names, cntr_dts)
+                    coords, ortho_coords = self.gen_irl_and_ortho_coords(cat_names, cntr_dts)
 
                     # ORTHO-LEVEL EVALUATION
 
                     # OUTPUT REAL COORDS
-                    print_irl_coords(coords)
+                    self.print_irl_coords(coords)
 
                 ### =========================================================== ###
 
