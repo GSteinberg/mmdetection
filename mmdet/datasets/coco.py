@@ -462,8 +462,7 @@ class CocoDataset(CustomDataset):
         for cat_id in range(len(cntr_dts)):
             for bbox in cntr_dts[cat_id]:
                 # row and col of image in respective orthophoto (img_ortho)
-                img_name = next(entry['file_name'] for entry in imgNames['images'] if entry['id'] == bbox[0], None)
-                img_name = img_name[0]
+                img_name = next(entry['file_name'] for entry in imgNames['images'] if entry['id'] == bbox[0])
                 split_img_name = img_name.split("_Split")
                 img_row, img_col = int(split_img_name[1][:3]), int(split_img_name[1][3:6])
                 img_ortho = split_img_name[0]
@@ -560,7 +559,7 @@ class CocoDataset(CustomDataset):
             root = tree.getroot()
 
             for boxes in root.iter('object'):
-                cat = boxes.find("name").text
+                cat = boxes.find("name").text.lower()
                 cat_id = cat_names.index(cat)
 
                 for box in boxes.findall("bndbox"):
@@ -571,23 +570,24 @@ class CocoDataset(CustomDataset):
 
         # modify cntr_dts img ids so they are at ortho level
         for cat in cntr_dts:
-            for dt in cntr_dts[cat]:
-                img_name = next(entry['file_name'] for entry in ann['images'] if entry['id'] == dt[0], None)
+            for dt in cat:
+                img_name = next(entry['file_name'] for entry in ann['images'] if entry['id'] == dt[0])
                 ortho_name = img_name.split("_Split")[0]
                 ortho_id = ortho_names.index(ortho_name)
                 dt[0] = ortho_id
 
         # calculate raw err seperately for each orthophoto
         raw_err_sep = []
-        for orth_i in range(len(ortho_names)):
+        for ortho_i in range(len(ortho_names)):
             curr_cntr_gts = [entry for entry in cntr_gts if entry[0] == ortho_i]
             curr_cntr_dts = [entry for entry in cntr_dts if entry[0] == ortho_i]
 
+            import pdb;pdb.set_trace()
             raw_err_sep.append( self.calc_tp_fp_fn(cat_ids, curr_cntr_gts, curr_cntr_dts) )
 
         # calculate precision, recall, F1 for each orthophoto
         rel_err_sep = []
-        for orth_i in range(len(ortho_names)):
+        for ortho_i in range(len(ortho_names)):
             rel_err_sep.append( self.prec_reca_f1(cat_ids, raw_err[ortho_i]) )
 
     def evaluate(self,
@@ -773,8 +773,8 @@ class CocoDataset(CustomDataset):
                         # if score for that box > prediction threshold, add to cntr_dts
                         # [img_id, score, x_coord, y_coord]
                         if dt['score'] > score_thr:
-                            cntr_dts[dt_catId].append((dt_imgId, dt['score'],
-                                    np.mean([dt_box[0], dt_box[2]]), np.mean([dt_box[1], dt_box[3]])))
+                            cntr_dts[dt_catId].append([dt_imgId, dt['score'],
+                                    np.mean([dt_box[0],dt_box[2]]), np.mean([dt_box[1],dt_box[3]])])
 
                     # calculate raw error
                     raw_err = self.calc_tp_fp_fn(catIds, cntr_gts, cntr_dts)
