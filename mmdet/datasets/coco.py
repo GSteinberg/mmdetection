@@ -578,17 +578,19 @@ class CocoDataset(CustomDataset):
 
         # calculate raw err seperately for each orthophoto
         raw_err_sep = []
+        curr_cntr_gts = []
+        curr_cntr_dts = []
         for ortho_i in range(len(ortho_names)):
-            curr_cntr_gts = [entry for entry in cntr_gts if entry[0] == ortho_i]
-            curr_cntr_dts = [entry for entry in cntr_dts if entry[0] == ortho_i]
+            for cat in range(len(cntr_gts)):
+                curr_cntr_gts.append([entry for entry in cntr_gts[cat] if entry[0] == ortho_i])
+                curr_cntr_dts.append([entry for entry in cntr_dts[cat] if entry[0] == ortho_i])
 
-            import pdb;pdb.set_trace()
             raw_err_sep.append( self.calc_tp_fp_fn(cat_ids, curr_cntr_gts, curr_cntr_dts) )
 
         # calculate precision, recall, F1 for each orthophoto
         rel_err_sep = []
         for ortho_i in range(len(ortho_names)):
-            rel_err_sep.append( self.prec_reca_f1(cat_ids, raw_err[ortho_i]) )
+            rel_err_sep.append( self.calc_prec_reca_f1(cat_ids, raw_err_sep[ortho_i]) )
 
     def evaluate(self,
                  results,
