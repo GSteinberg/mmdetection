@@ -363,6 +363,12 @@ class CocoDataset(CustomDataset):
         result_files = self.results2json(results, jsonfile_prefix)
         return result_files, tmp_dir
 
+    def get_test_img_names(self):
+        # get image names to coordinate to img ids
+        with open('landmine/test/coco_annotation.json') as outfile:
+            imgNames = json.load(outfile)
+        return imgNames
+
     def calc_tp_fp_fn(self, cat_ids, cntr_gts, cntr_dts, min_dist=8.5):
         num_classes = len(cat_ids)
         raw_err = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
@@ -451,10 +457,7 @@ class CocoDataset(CustomDataset):
         with open('../SplitData/COCO/meta_dict.json') as json_file:
             meta_sizes = json.load(json_file)
 
-        # get image names to coordinate to imgIds
-        with open('landmine/test/coco_annotation.json') as outfile:
-            imgNames = json.load(outfile)
-            del imgNames['annotations']
+        imgNames = self.get_test_img_names()
 
         for cat_id in range(len(cntr_dts)):
             for bbox in cntr_dts[cat_id]:
@@ -537,6 +540,29 @@ class CocoDataset(CustomDataset):
             for img_name in coords:
                 for c in coords[img_name]:
                     writer.writerow([img_name] + c[:])
+
+    def ortho_lvl(self, cat_ids, cat_names):
+        imgNames = self.get_test_img_names()
+
+        # get ground truth from orthophotos
+        gt = {ortho_name: [[] for _ in range(len(cat_ids))] for ortho_name in imgNames['images'].keys()}
+        for ortho_name in gt.keys():
+            if "Test" not in ortho_name:
+                ortho_path = ortho_name.split("_")[0] + "/annotations/"
+            else:
+                ortho_path = "Rubble_Test/annotations/"
+            tree = ET.parse("../OrthoData/" + ortho_path + ortho_name + ".xml")
+            root = tree.getroot()
+
+            for boxes in root.iter('object'):
+                name = boxes.find("name").text
+                for box in boxes.findall("bndbox"):
+                    xmin, ymin = int(box.find("xmin").text), int(box.find("ymin").text)
+                    xmax, ymax = int(box.find("xmax").text), int(box.find("ymax").text)
+
+                entry = [name, int((xmin+xmax) / 2), int((ymin+ymax) / 2), False]
+                gt[ortho_name].append(entry)
+
 
     def evaluate(self,
                  results,
@@ -742,10 +768,13 @@ class CocoDataset(CustomDataset):
                     # generate real world coords and orthophoto coords
                     coords, ortho_coords = self.gen_irl_and_ortho_coords(cat_names, cntr_dts)
 
-                    # ORTHO-LEVEL EVALUATION
-
                     # OUTPUT REAL COORDS
                     self.print_irl_coords(coords)
+
+                # True: do orthophoto-level evaluation
+                ortho_lvl_eval = True
+                if ortho_lvl_eval:
+                    self.ortho_lvl(catIds, cat_names)
 
                 ### =========================================================== ###
 
