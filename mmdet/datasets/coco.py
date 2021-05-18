@@ -9,6 +9,7 @@ import math
 import csv
 import os
 import utm
+import xml.etree.ElementTree as ET
 
 import mmcv
 import numpy as np
@@ -372,7 +373,6 @@ class CocoDataset(CustomDataset):
     def calc_tp_fp_fn(self, cat_ids, cntr_gts, cntr_dts, min_dist=8.5):
         num_classes = len(cat_ids)
         raw_err = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
-        min_dist = 8.5      # min dist between points
         for cat in cat_ids:
             for dt in cntr_dts[cat]:
                 match = False       # prevent duplicate matches
@@ -462,7 +462,7 @@ class CocoDataset(CustomDataset):
         for cat_id in range(len(cntr_dts)):
             for bbox in cntr_dts[cat_id]:
                 # row and col of image in respective orthophoto (img_ortho)
-                img_name = [entry['file_name'] for entry in imgNames['images'] if entry['id'] == bbox[0]]
+                img_name = next(entry['file_name'] for entry in imgNames['images'] if entry['id'] == bbox[0], None)
                 img_name = img_name[0]
                 split_img_name = img_name.split("_Split")
                 img_row, img_col = int(split_img_name[1][:3]), int(split_img_name[1][3:6])
@@ -541,13 +541,17 @@ class CocoDataset(CustomDataset):
                 for c in coords[img_name]:
                     writer.writerow([img_name] + c[:])
 
-    def ortho_lvl(self, cat_ids, cat_names):
+    def ortho_lvl(self, cat_ids, cat_names, cntr_dts):
+        num_classes = len(cat_ids)
+
         ann = self.get_test_img_names()
-        imgNames = [entry['file_name'] for entry in ann['images']]
+        ortho_names = set(entry['file_name'].split("_Split")[0] for entry in ann['images'])
+        ortho_names = sorted( list(ortho_names) )
 
         # get ground truth from orthophotos
-        gt = {ortho_name: [[] for _ in range(len(cat_ids))] for ortho_name in imgNames}
-        for ortho_name in gt.keys():
+        cntr_gts = [[] for _ in range(num_classes)]
+        for ortho_name in ortho_names:
+            # find corresponding orthophoto
             if "Test" not in ortho_name:
                 ortho_path = ortho_name.split("_")[0] + "/annotations/"
             else:
@@ -556,14 +560,35 @@ class CocoDataset(CustomDataset):
             root = tree.getroot()
 
             for boxes in root.iter('object'):
-                name = boxes.find("name").text
+                cat = boxes.find("name").text
+                cat_id = cat_names.index(cat)
+
                 for box in boxes.findall("bndbox"):
                     xmin, ymin = int(box.find("xmin").text), int(box.find("ymin").text)
                     xmax, ymax = int(box.find("xmax").text), int(box.find("ymax").text)
 
-                entry = [name, int((xmin+xmax) / 2), int((ymin+ymax) / 2), False]
-                gt[ortho_name].append(entry)
+                cntr_gts[cat_id].append([ortho_names.index(ortho_name), np.mean([xmin,xmax]), np.mean([ymin,ymax])])
 
+        # modify cntr_dts img ids so they are at ortho level
+        for cat in cntr_dts:
+            for dt in cntr_dts[cat]:
+                img_name = next(entry['file_name'] for entry in ann['images'] if entry['id'] == dt[0], None)
+                ortho_name = img_name.split("_Split")[0]
+                ortho_id = ortho_names.index(ortho_name)
+                dt[0] = ortho_id
+
+        # calculate raw err seperately for each orthophoto
+        raw_err_sep = []
+        for orth_i in range(len(ortho_names)):
+            curr_cntr_gts = [entry for entry in cntr_gts if entry[0] == ortho_i]
+            curr_cntr_dts = [entry for entry in cntr_dts if entry[0] == ortho_i]
+
+            raw_err_sep.append( self.calc_tp_fp_fn(cat_ids, curr_cntr_gts, curr_cntr_dts) )
+
+        # calculate precision, recall, F1 for each orthophoto
+        rel_err_sep = []
+        for orth_i in range(len(ortho_names)):
+            rel_err_sep.append( self.prec_reca_f1(cat_ids, raw_err[ortho_i]) )
 
     def evaluate(self,
                  results,
@@ -775,7 +800,7 @@ class CocoDataset(CustomDataset):
                 # True: do orthophoto-level evaluation
                 ortho_lvl_eval = True
                 if ortho_lvl_eval:
-                    self.ortho_lvl(catIds, cat_names)
+                    self.ortho_lvl(catIds, cat_names, cntr_dts)
 
                 ### =========================================================== ###
 
