@@ -542,10 +542,11 @@ class CocoDataset(CustomDataset):
                     writer.writerow([img_name] + c[:])
 
     def ortho_lvl(self, cat_ids, cat_names):
-        imgNames = self.get_test_img_names()
+        ann = self.get_test_img_names()
+        imgNames = [entry['file_name'] for entry in ann['images']]
 
         # get ground truth from orthophotos
-        gt = {ortho_name: [[] for _ in range(len(cat_ids))] for ortho_name in imgNames['images'].keys()}
+        gt = {ortho_name: [[] for _ in range(len(cat_ids))] for ortho_name in imgNames}
         for ortho_name in gt.keys():
             if "Test" not in ortho_name:
                 ortho_path = ortho_name.split("_")[0] + "/annotations/"
