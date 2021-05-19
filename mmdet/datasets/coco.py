@@ -644,13 +644,18 @@ class CocoDataset(CustomDataset):
             self.print_err_rep(cat_ids, raw_err_sep[ortho_i], rel_err_sep[ortho_i], err_rep_name)
 
         # print grand error report
-        raw_err_tot = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
-        rel_err_tot = [{"prec":0, "recall":0, "f1":0} for _ in range(num_classes)]
+        raw_err_tot = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes + 1)]
+        rel_err_tot = [{"prec":0, "recall":0, "f1":0} for _ in range(num_classes + 1)]
         for ortho_i in range(len(ortho_names)):
-            for key in raw_err_sep[ortho_i].keys():
-                raw_err_tot[key] += raw_err_sep[ortho_i][key]
-            for key in rel_err_sep[ortho_i].keys():
-                rel_err_tot[key] += rel_err_sep[ortho_i][key]
+            for cat in range(len(raw_err_sep[ortho_i])):
+                for key in raw_err_sep[ortho_i][cat].keys():
+                    raw_err_tot[cat][key] += raw_err_sep[ortho_i][cat][key]
+                for key in rel_err_sep[ortho_i][cat].keys():
+                    rel_err_tot[cat][key] += rel_err_sep[ortho_i][cat][key]
+
+        for cat in range(len(rel_err_tot)):
+            for key in rel_err_tot[cat].keys():
+                rel_err_tot[cat][key] /= len(ortho_names)
 
         err_rep_name = "error_report_{}_Grand.csv".format(str(score_thr)[2:])
         self.print_err_rep(cat_ids, raw_err_tot, rel_err_tot, err_rep_name)
