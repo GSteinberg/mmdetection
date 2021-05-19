@@ -462,7 +462,7 @@ class CocoDataset(CustomDataset):
 
         return ortho_x, ortho_y
 
-    def gen_irl_and_ortho_coords(self, cat_names, cntr_dts):
+    def gen_irl_and_ortho_coords(self, cat_names, cntr_dts, min_dist=8.5):
         coords = {}
         ortho_coords = {}
 
@@ -482,7 +482,6 @@ class CocoDataset(CustomDataset):
 
                 # throw out any duplicate boxes
                 dup = False
-                min_dist = 20
                 curr_pt = [ortho_x, ortho_y]
 
                 if img_ortho in ortho_coords.keys():
@@ -795,16 +794,20 @@ class CocoDataset(CustomDataset):
                                     np.mean([dt_box[0],dt_box[2]]), np.mean([dt_box[1],dt_box[3]])])
 
                     # removing any close duplicates in cntr_dts
+                    pt1 = pt2 = 0
+                    min_dist = 8.5
                     for cat in range(num_classes):
                         while pt1 < len(cntr_dts[cat]):
                             dup = False
                             while pt2 < len(cntr_dts[cat]):
-                                if pt1 == pt2: continue
+                                if pt1 == pt2:
+                                    pt2+=1
+                                    continue
 
                                 coords1 = cntr_dts[cat][pt1][2:]
                                 coords2 = cntr_dts[cat][pt2][2:]
-                                dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(corods1, coords2)]))
-                                if dist < MIN_DIST:
+                                dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(coords1, coords2)]))
+                                if dist < min_dist:
                                     cntr_dts[cat].pop(pt1)
                                     dup = True
                                     break
