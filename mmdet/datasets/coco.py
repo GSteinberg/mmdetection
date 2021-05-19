@@ -382,7 +382,7 @@ class CocoDataset(CustomDataset):
                     # if gt and dt are not in the same image, skip this gt
                     if gt[0] != dt[0]: continue
 
-                    # in same image
+                    # in same image - get center points
                     dt_cnt = dt[-2:]
                     gt_cnt = gt[-2:]
                     dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(dt_cnt,gt_cnt)]))
@@ -787,11 +787,29 @@ class CocoDataset(CustomDataset):
                         dt_catId = dt['category_id']
                         dt_imgId = dt['image_id']
                         dt_box = dt['segmentation'][0][:2] + dt['segmentation'][0][4:6]
+
                         # if score for that box > prediction threshold, add to cntr_dts
                         # [img_id, score, x_coord, y_coord]
                         if dt['score'] > score_thr:
                             cntr_dts[dt_catId].append([dt_imgId, dt['score'],
                                     np.mean([dt_box[0],dt_box[2]]), np.mean([dt_box[1],dt_box[3]])])
+
+                    # removing any close duplicates in cntr_dts
+                    for cat in range(num_classes):
+                        while pt1 < len(cntr_dts[cat]):
+                            dup = False
+                            while pt2 < len(cntr_dts[cat]):
+                                if pt1 == pt2: continue
+
+                                coords1 = cntr_dts[cat][pt1][2:]
+                                coords2 = cntr_dts[cat][pt2][2:]
+                                dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(corods1, coords2)]))
+                                if dist < MIN_DIST:
+                                    cntr_dts[cat].pop(pt1)
+                                    dup = True
+                                    break
+                                pt2+=1
+                            if not dup: pt1+=1
 
                     # calculate raw error
                     raw_err = self.calc_tp_fp_fn(catIds, cntr_gts, cntr_dts)
