@@ -573,7 +573,7 @@ class CocoDataset(CustomDataset):
                 if not dup: pt1+=1
         return cntr_dts
 
-    def ortho_lvl(self, cat_ids, cat_names, cntr_dts):
+    def ortho_lvl(self, cat_ids, cat_names, score_thr, cntr_dts):
         num_classes = len(cat_ids)
 
         ann = self.get_test_img_names()
@@ -637,6 +637,23 @@ class CocoDataset(CustomDataset):
         rel_err_sep = []
         for ortho_i in range(len(ortho_names)):
             rel_err_sep.append( self.calc_prec_reca_f1(cat_ids, raw_err_sep[ortho_i]) )
+
+        # print error reports
+        for ortho_i in range(len(ortho_names)):
+            err_rep_name = "error_report_{}_{}.csv".format(str(score_thr)[2:], ortho_names[ortho_i])
+            self.print_err_rep(cat_ids, raw_err_sep[ortho_i], rel_err_sep[ortho_i], err_rep_name)
+
+        # print grand error report
+        raw_err_tot = [{"tp":0, "fp":0, "fn":0} for _ in range(num_classes)]
+        rel_err_tot = [{"prec":0, "recall":0, "f1":0} for _ in range(num_classes)]
+        for ortho_i in range(len(ortho_names)):
+            for key in raw_err_sep[ortho_i].keys():
+                raw_err_tot[key] += raw_err_sep[ortho_i][key]
+            for key in rel_err_sep[ortho_i].keys():
+                rel_err_tot[key] += rel_err_sep[ortho_i][key]
+
+        err_rep_name = "error_report_{}_Grand.csv".format(str(score_thr)[2:])
+        self.print_err_rep(cat_ids, raw_err_tot, rel_err_tot, err_rep_name)
 
     def evaluate(self,
                  results,
@@ -849,7 +866,7 @@ class CocoDataset(CustomDataset):
                 # True: do orthophoto-level evaluation
                 ortho_lvl_eval = True
                 if ortho_lvl_eval:
-                    self.ortho_lvl(catIds, cat_names, cntr_dts)
+                    self.ortho_lvl(catIds, cat_names, score_thr, cntr_dts)
 
                 ### =========================================================== ###
 
