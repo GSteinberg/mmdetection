@@ -474,7 +474,8 @@ class CocoDataset(CustomDataset):
                 img_name = next(entry['file_name'] for entry in imgNames['images'] if entry['id'] == bbox[0])
                 split_img_name = img_name.split("_Split")
                 img_row, img_col = int(split_img_name[1][:3]), int(split_img_name[1][3:6])
-                full_img_ortho_name = split_img_name[0] + ".tif"
+                img_ortho = split_img_name[0]
+                full_img_ortho_name = img_ortho + ".tif"
 
                 # converting to orthophoto scale
                 ortho_x, ortho_y = self.conv_to_ortho_scale(full_img_ortho_name, img_col, img_row, bbox[-2], bbox[-1])
@@ -592,9 +593,9 @@ class CocoDataset(CustomDataset):
 
         # calculate raw err seperately for each orthophoto
         raw_err_sep = []
-        curr_cntr_gts = []
-        curr_cntr_dts = []
         for ortho_i in range(len(ortho_names)):
+            curr_cntr_gts = []
+            curr_cntr_dts = []
             for cat in range(len(cntr_gts)):
                 curr_cntr_gts.append([entry for entry in cntr_gts[cat] if entry[0] == ortho_i])
                 curr_cntr_dts.append([entry for entry in cntr_dts[cat] if entry[0] == ortho_i])
