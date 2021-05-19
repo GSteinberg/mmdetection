@@ -545,8 +545,9 @@ class CocoDataset(CustomDataset):
                 for c in coords[img_name]:
                     writer.writerow([img_name] + c[:])
 
-    def remove_dup(self, cntr_dts);
+    def remove_dup(self, cat_ids, cntr_dts):
         min_dist = 8.5
+        num_classes = len(cat_ids)
         for cat in range(num_classes):
             pt1 = 0
             while pt1 < len(cntr_dts[cat]):
@@ -619,7 +620,7 @@ class CocoDataset(CustomDataset):
                 dt[2], dt[3] = self.conv_to_ortho_scale(full_img_ortho_name, img_col, img_row, dt[2], dt[3])
 
         # remove duplicates from cntr_dts
-        cntr_dts = self.remove_dup(cntr_dts)
+        cntr_dts = self.remove_dup(cat_ids, cntr_dts)
 
         # calculate raw err seperately for each orthophoto
         raw_err_sep = []
