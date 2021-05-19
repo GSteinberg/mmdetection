@@ -545,6 +545,33 @@ class CocoDataset(CustomDataset):
                 for c in coords[img_name]:
                     writer.writerow([img_name] + c[:])
 
+    def remove_dup(self, cntr_dts);
+        min_dist = 8.5
+        for cat in range(num_classes):
+            pt1 = 0
+            while pt1 < len(cntr_dts[cat]):
+                dup = False
+                pt2 = 0
+                while pt2 < len(cntr_dts[cat]):
+                    if cntr_dts[cat][pt1][0] != cntr_dts[cat][pt2][0]:
+                        pt2+=1
+                        continue
+
+                    if pt1 == pt2:
+                        pt2+=1
+                        continue
+
+                    coords1 = cntr_dts[cat][pt1][2:]
+                    coords2 = cntr_dts[cat][pt2][2:]
+                    dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(coords1, coords2)]))
+                    if dist < min_dist:
+                        cntr_dts[cat].pop(pt1)
+                        dup = True
+                        break
+                    pt2+=1
+                if not dup: pt1+=1
+        return cntr_dts
+
     def ortho_lvl(self, cat_ids, cat_names, cntr_dts):
         num_classes = len(cat_ids)
 
@@ -591,31 +618,8 @@ class CocoDataset(CustomDataset):
                 # convert coords
                 dt[2], dt[3] = self.conv_to_ortho_scale(full_img_ortho_name, img_col, img_row, dt[2], dt[3])
 
-        min_dist = 8.5
-        for cat in range(num_classes):
-            pt1 = 0
-            while pt1 < len(cntr_dts[cat]):
-                dup = False
-
-                pt2 = 0
-                while pt2 < len(cntr_dts[cat]):
-                    if cntr_dts[cat][pt1][0] != cntr_dts[cat][pt2][0]:
-                        pt2+=1
-                        continue
-
-                    if pt1 == pt2:
-                        pt2+=1
-                        continue
-
-                    coords1 = cntr_dts[cat][pt1][2:]
-                    coords2 = cntr_dts[cat][pt2][2:]
-                    dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(coords1, coords2)]))
-                    if dist < min_dist:
-                        cntr_dts[cat].pop(pt1)
-                        dup = True
-                        break
-                    pt2+=1
-                if not dup: pt1+=1
+        # remove duplicates from cntr_dts
+        cntr_dts = self.remove_dup(cntr_dts)
 
         # calculate raw err seperately for each orthophoto
         raw_err_sep = []
@@ -819,27 +823,6 @@ class CocoDataset(CustomDataset):
                         if dt['score'] > score_thr:
                             cntr_dts[dt_catId].append([dt_imgId, dt['score'],
                                     np.mean([dt_box[0],dt_box[2]]), np.mean([dt_box[1],dt_box[3]])])
-
-                    # removing any close duplicates in cntr_dts
-                    pt1 = pt2 = 0
-                    min_dist = 8.5
-                    for cat in range(num_classes):
-                        while pt1 < len(cntr_dts[cat]):
-                            dup = False
-                            while pt2 < len(cntr_dts[cat]):
-                                if pt1 == pt2:
-                                    pt2+=1
-                                    continue
-
-                                coords1 = cntr_dts[cat][pt1][2:]
-                                coords2 = cntr_dts[cat][pt2][2:]
-                                dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(coords1, coords2)]))
-                                if dist < min_dist:
-                                    cntr_dts[cat].pop(pt1)
-                                    dup = True
-                                    break
-                                pt2+=1
-                            if not dup: pt1+=1
 
                     # calculate raw error
                     raw_err = self.calc_tp_fp_fn(catIds, cntr_gts, cntr_dts)
