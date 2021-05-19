@@ -386,13 +386,13 @@ class CocoDataset(CustomDataset):
                     dt_cnt = dt[-2:]
                     gt_cnt = gt[-2:]
                     dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(dt_cnt,gt_cnt)]))
-                    # TP: pred px matches ground truth px only once
-                    if dist < min_dist and not match:
-                        raw_err[cat]['tp'] += 1
+                    # TP: pred px matches a ground truth px
+                    if dist < min_dist:
+                        if not gt[1]:
+                            raw_err[cat]['tp'] += 1
+                            gt[1] = True
                         match = True
-                    # FP: duplicate pred boxes
-                    elif dist < min_dist and match:
-                        raw_err[cat]['fp'] += 1
+                        break
 
                 # FP: no truth box to match pred box
                 if not match:
@@ -571,7 +571,8 @@ class CocoDataset(CustomDataset):
                     xmin, ymin = int(box.find("xmin").text), int(box.find("ymin").text)
                     xmax, ymax = int(box.find("xmax").text), int(box.find("ymax").text)
 
-                cntr_gts[cat_id].append([ortho_names.index(ortho_name), np.mean([xmin,xmax]), np.mean([ymin,ymax])])
+                # [img_id, matched_flag, x_coord, y_coord]
+                cntr_gts[cat_id].append([ortho_names.index(ortho_name), False, np.mean([xmin,xmax]), np.mean([ymin,ymax])])
 
         # modify cntr_dts img ids so they are at ortho level
         for cat in cntr_dts:
@@ -589,6 +590,32 @@ class CocoDataset(CustomDataset):
 
                 # convert coords
                 dt[2], dt[3] = self.conv_to_ortho_scale(full_img_ortho_name, img_col, img_row, dt[2], dt[3])
+
+        min_dist = 8.5
+        for cat in range(num_classes):
+            pt1 = 0
+            while pt1 < len(cntr_dts[cat]):
+                dup = False
+
+                pt2 = 0
+                while pt2 < len(cntr_dts[cat]):
+                    if cntr_dts[cat][pt1][0] != cntr_dts[cat][pt2][0]:
+                        pt2+=1
+                        continue
+
+                    if pt1 == pt2:
+                        pt2+=1
+                        continue
+
+                    coords1 = cntr_dts[cat][pt1][2:]
+                    coords2 = cntr_dts[cat][pt2][2:]
+                    dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(coords1, coords2)]))
+                    if dist < min_dist:
+                        cntr_dts[cat].pop(pt1)
+                        dup = True
+                        break
+                    pt2+=1
+                if not dup: pt1+=1
 
         # calculate raw err seperately for each orthophoto
         raw_err_sep = []
