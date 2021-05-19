@@ -449,13 +449,22 @@ class CocoDataset(CustomDataset):
             for key in rel_err[0].keys():
                 writer.writerow([key] + ["{:.4f}".format(rel_err[i][key]) for i in range(len(rel_err))])
 
-    def gen_irl_and_ortho_coords(self, cat_names, cntr_dts):
-        coords = {}
-        ortho_coords = {}
-
+    def conv_to_ortho_scale(self, ortho_name, col, row, crop_x, crop_y):
         # for cropped img size and stride
         with open('../SplitData/COCO/meta_dict.json') as json_file:
             meta_sizes = json.load(json_file)
+
+        # getting cropped img size and stride
+        size_minus_stride = meta_sizes[ortho_name][0] - meta_sizes[ortho_name][1]
+
+        # converting to orthophoto scale
+        ortho_x, ortho_y = crop_x + (col*size_minus_stride), crop_y + (row*size_minus_stride)
+
+        return ortho_x, ortho_y
+
+    def gen_irl_and_ortho_coords(self, cat_names, cntr_dts):
+        coords = {}
+        ortho_coords = {}
 
         imgNames = self.get_test_img_names()
 
@@ -465,14 +474,10 @@ class CocoDataset(CustomDataset):
                 img_name = next(entry['file_name'] for entry in imgNames['images'] if entry['id'] == bbox[0])
                 split_img_name = img_name.split("_Split")
                 img_row, img_col = int(split_img_name[1][:3]), int(split_img_name[1][3:6])
-                img_ortho = split_img_name[0]
-                full_img_ortho_name = img_ortho + ".tif"
-
-                # getting cropped img size and stride
-                size_minus_stride = meta_sizes[full_img_ortho_name][0] - meta_sizes[full_img_ortho_name][1]
+                full_img_ortho_name = split_img_name[0] + ".tif"
 
                 # converting to orthophoto scale
-                ortho_x, ortho_y = bbox[-2] + (img_col*size_minus_stride), bbox[-1] + (img_row*size_minus_stride)
+                ortho_x, ortho_y = self.conv_to_ortho_scale(full_img_ortho_name, img_col, img_row, bbox[-2], bbox[-1])
 
                 # throw out any duplicate boxes
                 dup = False
@@ -571,10 +576,19 @@ class CocoDataset(CustomDataset):
         # modify cntr_dts img ids so they are at ortho level
         for cat in cntr_dts:
             for dt in cat:
+                # convert img ids
                 img_name = next(entry['file_name'] for entry in ann['images'] if entry['id'] == dt[0])
-                ortho_name = img_name.split("_Split")[0]
-                ortho_id = ortho_names.index(ortho_name)
+                split_img_name = img_name.split("_Split")
+                img_row, img_col = int(split_img_name[1][:3]), int(split_img_name[1][3:6])
+                img_ortho = split_img_name[0]
+
+                ortho_id = ortho_names.index(img_ortho)
                 dt[0] = ortho_id
+
+                full_img_ortho_name = img_ortho + ".tif"
+
+                # convert coords
+                dt[2], dt[3] = self.conv_to_ortho_scale(full_img_ortho_name, img_col, img_row, dt[2], dt[3])
 
         # calculate raw err seperately for each orthophoto
         raw_err_sep = []
