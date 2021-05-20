@@ -826,7 +826,9 @@ class CocoDataset(CustomDataset):
 
                 # True:  calc score for multiple thresholds to convert to a graph
                 # False: calc score for one threshold
-                AUC_chart = False
+                AUC_chart = True
+                ortho_lvl_eval = True       # True: do orthophoto-level evaluation
+                output_coords = True        # True: output real world coords of detections
                 for score_thr in np.arange(0, 1, 0.05):
                     # if no chart is wanted, set one threshold
                     if not AUC_chart:
@@ -847,6 +849,11 @@ class CocoDataset(CustomDataset):
                             cntr_dts[dt_catId].append([dt_imgId, dt['score'],
                                     np.mean([dt_box[0],dt_box[2]]), np.mean([dt_box[1],dt_box[3]])])
 
+                    # reset matching flag in cntr_gts
+                    for cat in cntr_gts:
+                        for el in cat:
+                            el[1] = False
+
                     # calculate raw error
                     raw_err = self.calc_tp_fp_fn(catIds, cntr_gts, cntr_dts)
                     
@@ -857,21 +864,20 @@ class CocoDataset(CustomDataset):
                     err_rep_name = "error_report_{}.csv".format(str(score_thr)[2:])
                     self.print_err_rep(catIds, raw_err, rel_err, err_rep_name)
 
+                    # ortho-lvl eval
+                    if ortho_lvl_eval:
+                        self.ortho_lvl(catIds, cat_names, score_thr, cntr_dts)
+
                     if not AUC_chart: break
 
-                # True: output real world coords of detections
-                output_coords = True
-                if output_coords:
+                # output real world det coords
+                # if AUC chart is on, no coords will b outputted
+                if output_coords and not AUC_chart:
                     # generate real world coords and orthophoto coords
                     coords, ortho_coords = self.gen_irl_and_ortho_coords(cat_names, cntr_dts)
 
                     # OUTPUT REAL COORDS
                     self.print_irl_coords(coords)
-
-                # True: do orthophoto-level evaluation
-                ortho_lvl_eval = True
-                if ortho_lvl_eval:
-                    self.ortho_lvl(catIds, cat_names, score_thr, cntr_dts)
 
                 ### =========================================================== ###
 
