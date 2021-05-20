@@ -3,8 +3,6 @@ import pickle
 import shutil
 import tempfile
 import time
-import math
-import xml.etree.ElementTree as ET
 
 import mmcv
 import torch
@@ -22,7 +20,6 @@ def single_gpu_test(model,
                     show_score_thr=0.3):
     model.eval()
     results = []
-    pd = {}
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
@@ -51,19 +48,12 @@ def single_gpu_test(model,
                 else:
                     out_file = None
 
-                curr_pd = model.module.show_result(
+                model.module.show_result(
                     img_show,
                     result[i],
                     show=show,
                     out_file=out_file,
                     score_thr=show_score_thr)
-
-                # add current preds to preds
-                for ortho_name in curr_pd.keys():
-                    if ortho_name not in pd.keys():
-                        pd[ortho_name] = curr_pd[ortho_name]
-                    else:
-                        pd[ortho_name].extend(curr_pd[ortho_name])
 
         # encode mask results
         if isinstance(result[0], tuple):
@@ -73,81 +63,6 @@ def single_gpu_test(model,
 
         for _ in range(batch_size):
             prog_bar.update()
-    
-    # get ground truth for ortho level eval
-    gt = {ortho_name: [] for ortho_name in pd.keys()}
-
-    for ortho_name in gt.keys():
-        if "Test" not in ortho_name:
-            ortho_path = ortho_name.split("_")[0] + "/annotations/"
-        else:
-            ortho_path = "Rubble_Test/annotations/"
-        tree = ET.parse("../OrthoData/" + ortho_path + ortho_name + ".xml")
-        root = tree.getroot()
-
-        for boxes in root.iter('object'):
-            name = boxes.find("name").text
-            for box in boxes.findall("bndbox"):
-                xmin, ymin = int(box.find("xmin").text), int(box.find("ymin").text)
-                xmax, ymax = int(box.find("xmax").text), int(box.find("ymax").text)
-            
-            entry = [name, int((xmin+xmax) / 2), int((ymin+ymax) / 2), False]
-            gt[ortho_name].append(entry)
-
-    # prepare error dict - 2 classes
-    classes = ["pfm-1", "ksf-casing"]
-    raw_err = {ortho_name : [{"tp":0, "fp":0, "fn":0} for _ in range(len(classes))] for ortho_name in gt.keys()}
-    tot_gt = {ortho_name : [0 for _ in range(len(classes))] for ortho_name in gt.keys()}
-    tot_err = [{"tp":0, "fp":0, "fn":0} for _ in range(len(classes))]
-
-    # ortho level evaluation
-    min_dist = 20
-    for ortho in pd.keys():
-        # for each pd point in respective ortho
-        for pd_entry in pd[ortho]:
-            match_for_pd = False
-
-            # each gt point for same ortho
-            for gt_entry in gt[ortho]:
-                # if different object - go to next gt
-                pd_cat = pd_entry[0]
-                gt_cat = classes.index(gt_entry[0].lower())
-                if pd_cat != gt_cat: continue
-
-                pd_coord = pd_entry[2:]
-                gt_coord = gt_entry[1:]
-                dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(pd_coord,gt_coord)]))
-
-                # TP: if dist is appropriate
-                if dist < min_dist:
-                    # if dt has not been matched yet
-                    if not gt_entry[-1]:
-                        raw_err[ortho][pd_cat]['tp'] += 1
-                        gt_entry[-1] = True     # set gt to 'has been matched'
-                    match_for_pd = True     # set pd to 'has been matched'
-                    break
-            
-            # FP: no gt to match pd
-            if not match_for_pd:
-                raw_err[ortho][pd_cat]['fp'] += 1
-    
-        # total ground truths for each cat
-        for gt_entry in gt[ortho]:
-            class_name = gt_entry[0].lower()
-            class_i = classes.index(class_name)
-            tot_gt[ortho][class_i] += 1
-
-        # FN: if # accurately predicted boxes < total # ground truths
-        for cat_i in range(len(classes)):
-            if raw_err[ortho][cat_i]['tp'] < tot_gt[ortho][cat_i]:
-                raw_err[ortho][cat_i]['fn'] += tot_gt[ortho][cat_i] - raw_err[ortho][cat_i]['tp']
-
-        # fill tot_err
-        for cat_i in range(len(classes)):
-            cat_entry = raw_err[ortho][cat_i]
-            for met in cat_entry.keys():
-                tot_err[cat_i][met] += cat_entry[met]
-
     return results
 
 

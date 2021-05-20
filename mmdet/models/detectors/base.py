@@ -1,13 +1,8 @@
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 
-import csv
 import mmcv
 import numpy as np
-import os
-import json
-import math
-import utm
 import torch
 import torch.distributed as dist
 from mmcv.runner import BaseModule, auto_fp16
@@ -299,10 +294,6 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
         Returns:
             img (Tensor): Only if not `show` or `out_file`
         """
-        if isinstance(img, str):
-            img_name = img.split("/")[-1]
-        else:
-            img_name = out_file.split("/")[-1]
         img = mmcv.imread(img)
         img = img.copy()
         if isinstance(result, tuple):
@@ -328,128 +319,23 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
         # if out_file specified, do not show image in window
         if out_file is not None:
             show = False
-
-        coords = {}
-        ortho_coords = {}
-        for idx, bbox in enumerate(bboxes):
-            # if score is greater than score threshold
-            if bbox[4] > score_thr:
-                # row and col of image in respective orthophoto (img_ortho)
-                split_img_name = img_name.split("_Split")
-                img_row, img_col = int(split_img_name[1][:3]), int(split_img_name[1][3:6])
-                img_ortho = split_img_name[0]
-                full_img_ortho_name = img_ortho + ".tif"
-            
-                # 2 elemt list of pixel of center of landmine
-                # structure: [average(xmin, xmax), average(ymin, ymax)]
-                cropped_px = [ int( np.mean([int(bbox[0]),int(bbox[2])]) ),
-                               int( np.mean([int(bbox[1]),int(bbox[3])]) ) ]
-                score = float(bbox[4])
-
-                # getting cropped img size and stride
-                with open('../SplitData/COCO/meta_dict.json') as json_file:
-                    meta_sizes = json.load(json_file)
-                size_minus_stride = meta_sizes[full_img_ortho_name][0] - meta_sizes[full_img_ortho_name][1]
-
-                # print for drawing on ortho
-                xmin_p = bbox[0] + (img_col*size_minus_stride)
-                ymin_p = bbox[1] + (img_row*size_minus_stride)
-                xmax_p = bbox[2] + (img_col*size_minus_stride)
-                ymax_p = bbox[3] + (img_row*size_minus_stride)
-                # print("{}.tif {} {} {} {} {}".format(img_ortho, xmin_p, ymin_p, xmax_p, ymax_p, labels[idx]))
-
-                # converting to orthophoto scale
-                ortho_x, ortho_y = cropped_px[0] + (img_col*size_minus_stride), \
-                                   cropped_px[1] + (img_row*size_minus_stride)
-
-                # throw out any duplicate boxes
-                dup = False
-                min_dist = 20
-                curr_pt = [ortho_x, ortho_y]
-
-                if img_ortho in ortho_coords.keys():
-                    for pt in ortho_coords[img_ortho]:
-                        dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(pt[2:],curr_pt)]))
-                        if dist < min_dist:
-                            dup = True
-                            break
-                if dup: continue
-
-                # fetch respective ortho metdata
-                # structure: metadata[0]    == x-pixel res
-                #            metadata[1:3]  == rotational components
-                #            metadata[3]    == y-pixel res
-                #            metadata[4]    == Easting of upper left pixel
-                #            metadata[5]    == Northing of upper left pixel
-                ortho_dir = os.path.join("../OrthoData/metadata", \
-                            img_ortho + ".tfw")
-                f = open(ortho_dir, "r")
-                metadata = f.read().split("\n")[:-1]
-                f.close()
-
-                x_res, y_res, easting, northing = \
-                        float(metadata[0]), float(metadata[3]), \
-                        float(metadata[4]), float(metadata[5])
-
-                if img_ortho not in coords.keys():
-                    coords[img_ortho] = []
-                coords[img_ortho].append([labels[idx], score,
-                        easting + (ortho_x*x_res), northing + (ortho_y*y_res)])
-
-                # output for orthophoto level eval
-                if img_ortho not in ortho_coords.keys():
-                    ortho_coords[img_ortho] = []
-                ortho_coords[img_ortho].append([labels[idx], score, ortho_x, ortho_y])
-
-        if coords:
-            # ortho this photo belongs to
-            img_name = [*coords][0]
-
-            # convert utm to lat long
-            for pnt in range(len(coords[img_name])):
-                lat_long = utm.to_latlon(coords[img_name][pnt][2], coords[img_name][pnt][3], 18, 'T')
-                coords[img_name][pnt].extend(lat_long)
-
-            # coords for each ortho
-            indv_ortho_file = 'faster_rcnn_r101_fpn_1x_coco_results/' + img_name + '_coords.csv'
-            with open(indv_ortho_file, 'a+', newline='') as csvfile:
-                writer = csv.writer(csvfile)
-                # if file is empty, write heading then append, else just append
-                if os.stat(indv_ortho_file).st_size == 0:
-                    writer.writerow(["Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
-                for c in coords[img_name]:
-                    writer.writerow(c[:])
-
-            # all coords from all orthos
-            all_coords_file = 'faster_rcnn_r101_fpn_1x_coco_results/all_coords.csv'
-            with open(all_coords_file, 'a+', newline='') as csvfile:
-                writer = csv.writer(csvfile)
-                # if file is empty, write heading then append, else just append
-                if os.stat(all_coords_file).st_size == 0:
-                    writer.writerow(["Photo", "Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
-                for c in coords[img_name]:
-                    writer.writerow([img_name] + c[:])
-
         # draw bounding boxes
-        # img = imshow_det_bboxes(
-        #     img,
-        #     bboxes,
-        #     labels,
-        #     segms,
-        #     class_names=self.CLASSES,
-        #     score_thr=score_thr,
-        #     bbox_color=bbox_color,
-        #     text_color=text_color,
-        #     mask_color=mask_color,
-        #     thickness=thickness,
-        #     font_size=font_size,
-        #     win_name=win_name,
-        #     show=show,
-        #     wait_time=wait_time,
-        #     out_file=out_file)
+        img = imshow_det_bboxes(
+            img,
+            bboxes,
+            labels,
+            segms,
+            class_names=self.CLASSES,
+            score_thr=score_thr,
+            bbox_color=bbox_color,
+            text_color=text_color,
+            mask_color=mask_color,
+            thickness=thickness,
+            font_size=font_size,
+            win_name=win_name,
+            show=show,
+            wait_time=wait_time,
+            out_file=out_file)
 
         if not (show or out_file):
-            pass
-            # return img
-        else:
-            return ortho_coords
+            return img
