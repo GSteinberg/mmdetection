@@ -820,9 +820,9 @@ class CocoDataset(CustomDataset):
                     gt_catId = gt['category_id']
                     gt_imgId = gt['image_id']
                     gt_box = gt['segmentation'][0][:2] + gt['segmentation'][0][4:6]
-                    # [img_id, x_coord, y_coord]
+                    # [img_id, matched_flag, x_coord, y_coord]
                     cntr_gts[gt_catId].append(
-                            (gt_imgId, np.mean([gt_box[0], gt_box[2]]), np.mean([gt_box[1], gt_box[3]])))
+                            [gt_imgId, False, np.mean([gt_box[0], gt_box[2]]), np.mean([gt_box[1], gt_box[3]])])
 
                 # True:  calc score for multiple thresholds to convert to a graph
                 # False: calc score for one threshold
