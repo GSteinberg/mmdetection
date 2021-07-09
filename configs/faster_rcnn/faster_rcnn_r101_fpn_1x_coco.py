@@ -3,7 +3,10 @@ model = dict(
     roi_head=dict(
         bbox_head=dict(num_classes=2)),
     pretrained='torchvision://resnet101',
-    backbone=dict(depth=101))
+    backbone=dict(
+        depth=101,
+        init_cfg=dict(type='Pretrained',
+                      checkpoint='torchvision://resnet101')))
 
 runner = dict(type='EpochBasedRunner', max_epochs=50)
 dataset_type = 'CocoDataset'
