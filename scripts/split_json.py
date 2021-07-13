@@ -7,7 +7,7 @@ import json
 import pdb
 
 target_dir = sys.argv[1]
-dir_w_ann = "../SplitData/COCO/"
+dir_w_ann = "../SplitData/COCO_no_slivers/"
 # contents of target dir
 dir_cont = os.listdir(target_dir)
 
