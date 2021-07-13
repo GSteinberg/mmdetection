@@ -2,7 +2,6 @@ _base_ = './faster_rcnn_r50_fpn_1x_coco.py'
 model = dict(
     roi_head=dict(
         bbox_head=dict(num_classes=2)),
-    pretrained='torchvision://resnet101',
     backbone=dict(
         depth=101,
         init_cfg=dict(type='Pretrained',
